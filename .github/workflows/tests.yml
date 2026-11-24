@@ -38,7 +38,7 @@ jobs:
       - name: Build React components
         run: npm run build
       - name: Verify committed bundle
-        run: git diff --exit-code -- dist/components.js dist/pilot.js
+        run: git diff --exit-code -- dist/components.js dist/pilot.js dist/index.html dist/pilot.html
       - name: Run tests
         run: node --test tests/*.test.cjs
       - name: PostgreSQL integration tests

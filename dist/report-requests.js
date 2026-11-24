@@ -96,7 +96,7 @@
     openPerformance(project.id);
     const year = Number(month.slice(0, 4)), select = document.querySelector('#reportYear');
     if (select && [...select.options].some(option => option.value === String(year))) { select.value = String(year); changeReportYear(year); }
-    document.querySelector(`[data-report-month="${month}"][data-report-kind="actual"]`)?.focus();
+    window.StepUI?.selectReportMonth?.(month);document.querySelector(`[data-report-month="${month}"][data-report-kind="actual"]`)?.focus();
     return true;
   }
   window.ReportRequests = Object.freeze({ openDeepLink, render: renderRequests });

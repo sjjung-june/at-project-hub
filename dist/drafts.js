@@ -186,6 +186,7 @@
       yearSelect.value = String(reportYear);
     }
     if (PlanModel.isWeighted(current)) StepUI.restoreReports(snapshot.stepReports);
+    else window.StepUI?.restoreOverall?.(performanceDraft);
     drawReportGrid();
     reportPreview();
     return true;
