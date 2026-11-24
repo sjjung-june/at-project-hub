@@ -69,7 +69,7 @@ class ProjectService:
         with self.pool.connection() as conn:
             return self._save(conn, project, None, actor, "project_created")
 
-    def _mutate(self, project_id, revision, actor, action, change):
+    def _mutate(self, project_id, revision, actor, action, change, with_connection=False):
         with self.pool.connection() as conn:
             row = conn.execute("SELECT document,revision FROM projects WHERE id=%s FOR UPDATE", [project_id]).fetchone()
             if not row:
@@ -77,10 +77,12 @@ class ProjectService:
             if revision != row["revision"]:
                 raise DomainError("다른 사용자가 수정했습니다. 최신 과제를 다시 불러와 주세요.", 409)
             before = row["document"]
-            return self._save(conn, change(deepcopy(before)), before, actor, action)
+            next_project = change(deepcopy(before), conn) if with_connection else change(deepcopy(before))
+            return self._save(conn, next_project, before, actor, action)
 
     def reports(self, project_id, revision, body, actor):
         def change(project):
+            from .reporting import assert_month_editable
             assert_edit(project, actor)
             if project.get("archivedAt"):
                 raise DomainError("보관 과제는 실적을 수정할 수 없습니다.")
@@ -94,6 +96,7 @@ class ProjectService:
                     if step_id not in steps:
                         raise DomainError("등록되지 않은 Step입니다.")
                     for month, row in rows.items():
+                        assert_month_editable(project, month)
                         if month not in active or month < steps[step_id]["startDate"][:7]:
                             raise DomainError("Step 보고 기간을 확인해 주세요.")
                         reports.setdefault(step_id, {}).setdefault(month, {}).update(row.model_dump(exclude_unset=True))
@@ -102,6 +105,7 @@ class ProjectService:
                 if body.monthly is None or body.stepReports is not None:
                     raise DomainError("과제의 월별 실적을 입력해 주세요.")
                 for month, row in body.monthly.items():
+                    assert_month_editable(project, month)
                     if month not in active:
                         raise DomainError("과제 보고 기간을 확인해 주세요.")
                     project["monthly"][month].update(row.model_dump(exclude_unset=True))

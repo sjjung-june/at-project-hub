@@ -76,7 +76,7 @@ def test_database_workflow_locking_rollback_and_audit(pool, project, actor):
         with pool.connection() as conn:
             conn.execute("DELETE FROM audit_events WHERE project_id=%s", [pid])
     with pool.connection() as conn:
-        assert conn.execute("SELECT count(*) AS count FROM schema_migrations").fetchone()["count"] == 1
+        assert conn.execute("SELECT count(*) AS count FROM schema_migrations").fetchone()["count"] == 2
         assert conn.execute("SELECT status FROM change_requests WHERE id=%s", [request_id]).fetchone()["status"] == "approved"
 
 

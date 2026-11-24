@@ -30,8 +30,11 @@ services:
       DATABASE_URL: postgresql://at_app:${POSTGRES_PASSWORD}@postgres:5432/at_project_hub
     ports:
       - '127.0.0.1:8000:8000'
+    volumes:
+      - at_attachments:/data/attachments
     depends_on:
       migrate:
         condition: service_completed_successfully
 volumes:
   at_project_data:
+  at_attachments:

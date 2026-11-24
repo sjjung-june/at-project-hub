@@ -16,7 +16,7 @@ def snapshot(project):
     result = {field: sorted(project.get(field, [])) if field in ("tech", "special") else str(project.get(field) or "").strip() for field in FIELDS}
     if weighted(project):
         result["stepPlanMode"] = "weighted-steps-v1"
-        result["steps"] = [{"id": s["id"], "name": s["name"].strip(), "weight": percent(s["weight"]), "startDate": s["startDate"], "endDate": s["endDate"], "monthly": {m: {"goal": percent(r.get("goal"))} for m, r in sorted(s.get("monthly", {}).items())}} for s in project.get("steps", [])]
+        result["steps"] = [{"id": s["id"], "name": s["name"].strip(), "weight": percent(s["weight"]), "completionCriteria": s.get("completionCriteria", ""), "evidenceRequired": s.get("evidenceRequired", False), "startDate": s["startDate"], "endDate": s["endDate"], "monthly": {m: {"goal": percent(r.get("goal"))} for m, r in sorted(s.get("monthly", {}).items())}} for s in project.get("steps", [])]
         project = totals(project)
     result["monthly"] = {m: {"goal": percent(r.get("goal"))} for m, r in sorted(project.get("monthly", {}).items())}
     result["archivedAt"] = project.get("archivedAt") or None

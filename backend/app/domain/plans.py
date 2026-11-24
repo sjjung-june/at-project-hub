@@ -160,7 +160,7 @@ def validate_reports(project, as_of=None, require_explanations=True):
                 raise DomainError(f"{name} {month} 누적 실적은 이전 값 이상이어야 합니다.")
             previous = actual
             goal = step_goal(step, month) if step else percent(row.get("goal"))
-            if require_explanations and month <= cutoff and goal is not None and actual < goal:
+            if require_explanations and month <= cutoff and goal is not None and actual < goal and project.get('_reporting',{}).get(month,{}).get('status') not in ('submitted','approved'):
                 if not str(row.get("reason", "")).strip() or not str(row.get("catchup", "")).strip():
                     raise DomainError(f"{name} {month} 지연 사유와 Catch Up Plan을 입력해 주세요.")
 

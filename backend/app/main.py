@@ -10,6 +10,7 @@ from .db import make_pool
 from .auth import make_jwks
 from .errors import DomainError
 from .api.projects import router
+from .api.pilot import router as pilot_router
 
 
 def create_app(settings=None, pool=None):
@@ -59,6 +60,7 @@ def create_app(settings=None, pool=None):
         return {"status": "ok", "database": "postgresql", "framework": "fastapi"}
 
     app.include_router(router)
+    app.include_router(pilot_router)
     return app
 
 

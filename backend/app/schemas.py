@@ -1,5 +1,5 @@
 from typing import Any, Literal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Role = Literal["at-head", "team-lead", "system-admin", "project-representative", "participant", "member"]
 
@@ -21,6 +21,8 @@ class StepPlan(BaseModel):
     id: str = Field(min_length=1, max_length=128)
     name: str = Field(min_length=1, max_length=120)
     weight: float = Field(gt=0, le=100, allow_inf_nan=False)
+    completionCriteria: str = Field(default="", max_length=2000)
+    evidenceRequired: bool = False
     startDate: str
     endDate: str
     monthly: dict[str, GoalRow]
@@ -81,3 +83,15 @@ class ProjectList(BaseModel):
     projects: list[dict[str, Any]]
     limit: int
     offset: int
+
+
+class ReportReview(BaseModel):
+    decision: Literal["approved", "returned"]
+    comment: str = Field(min_length=1, max_length=10000)
+
+    @field_validator('comment')
+    @classmethod
+    def nonblank(cls,value):
+        if not value.strip():
+            raise ValueError('검토 의견이 필요합니다.')
+        return value
