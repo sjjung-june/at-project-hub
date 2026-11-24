@@ -184,3 +184,48 @@ def test_P07_filename_is_never_a_storage_path():
     assert safe_filename('../../evidence.txt')=='evidence.txt'
     assert safe_filename('C:\\temp\\evidence.txt')=='evidence.txt'
     with pytest.raises(DomainError):validate_content('image.png',b'<html>')
+
+
+def test_P24_HTTP_monthly_clock_missed_report_backfill_and_human_errors(pilot,monkeypatch):
+    from datetime import datetime
+    from app import clock
+    client,app,root=pilot
+    def travel(utc):monkeypatch.setattr(clock,'utc_now',lambda:datetime.fromisoformat(utc))
+    travel('2027-12-01T00:00:00+00:00')
+    body={'title':'[파일럿] 시간 모사','team':'AT팀','tech':['All Tech'],'startDate':'2027-12-01','endDate':'2028-03-31','stepPlanMode':'weighted-steps-v1','steps':[{'id':'a','name':'검증','weight':100,'startDate':'2027-12-01','endDate':'2028-03-31','monthly':{m:{'goal':v} for m,v in zip(['2027-12','2028-01','2028-02','2028-03'],[25,50,75,100])}}]}
+    response=client.post('/api/projects',json=body);assert response.status_code==201,response.text
+    p=response.json()
+    def rejected(rows,code=422):
+        result=client.put(f"/api/projects/{p['id']}/reports",headers={'If-Match':f'"{p["_revision"]}"'},json={'stepReports':{'a':rows}})
+        assert result.status_code==code,result.text
+        assert client.get(f"/api/projects/{p['id']}").json()['_revision']==p['_revision']
+        return result
+    # December is forgotten; wrong future month is rejected, not silently saved.
+    rejected({'2028-01':{'actual':50}})
+    travel('2028-01-31T00:00:00+00:00')
+    p=save(client,p,{'a':{'2028-01':{'actual':50}}})
+    assert client.get('/api/statistics?month=2027-12').json()['counts']['unknown']==1
+    assert client.get('/api/statistics?month=2028-01').json()['counts']['onTarget']==1
+    p=update(client,p,'months/2028-01/submit').json()
+    sid=p['_reporting']['2028-01']['id'];lead(app)
+    result=update(client,p,f'submissions/{sid}/review',{'decision':'approved','comment':'1월 누적 확인'});assert result.status_code==200,result.text;p=result.json()
+    app.state.person=Actor(id='owner',name='과제 대표',role='project-representative',team='AT팀')
+    travel('2028-02-29T00:00:00+00:00')
+    rejected({'2028-02':{'actual':25}}) # increase mistaken for cumulative total
+    rejected({'2028-02':{'actual':60,'reason':'지연'}}) # missing catch-up plan
+    p=save(client,p,{'a':{'2028-02':{'actual':60,'reason':'설비 지연','catchup':'추가 검증'}}})
+    travel('2028-03-31T00:00:00+00:00')
+    p=save(client,p,{'a':{'2028-03':{'actual':85,'reason':'누적 미달','catchup':'추가 검증'}}})
+    assert client.get('/api/statistics?month=2028-03').json()['counts']['late']==1
+    # After planned end, backfill original month. Mistaken higher backfill rolls back.
+    travel('2028-04-10T00:00:00+00:00')
+    rejected({'2027-12':{'actual':60}})
+    p=save(client,p,{'a':{'2027-12':{'actual':25}}})
+    response=update(client,p,'months/2027-12/submit');assert response.status_code==200,response.text;p=response.json()
+    assert p['_reporting']['2027-12']['submittedAt'].startswith('2028-04-10')
+    assert client.get('/api/statistics?month=2027-12').json()['counts']['unknown']==0
+    assert client.get('/api/statistics?month=2028-03').json()['counts']['late']==1
+    assert update(client,p,'months/2027-12/submit').status_code==409
+    rejected({'2027-12':{'actual':30}},409)
+    frozen=client.get(f"/api/projects/{p['id']}/submissions?month=2028-01").json()['submissions'][0]['snapshot']
+    assert frozen['monthly']['actual']==50

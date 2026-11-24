@@ -4,9 +4,9 @@ Stored Step goals/actuals are 0..100 completion ratios. The UI displays each
 ratio * weight / 100 as a contribution capped by that Step's weight.
 """
 from copy import deepcopy
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal, InvalidOperation
-from zoneinfo import ZoneInfo
+from .. import clock
 from ..errors import DomainError
 
 MODE = "cumulative-percent-v1"
@@ -14,7 +14,7 @@ WEIGHTED = "weighted-steps-v1"
 
 
 def now_month():
-    return datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m")
+    return clock.seoul_month()
 
 
 def percent(value):
@@ -157,7 +157,7 @@ def validate_reports(project, as_of=None, require_explanations=True):
             if actual is None:
                 continue
             if previous is not None and actual < previous:
-                raise DomainError(f"{name} {month} 누적 실적은 이전 값 이상이어야 합니다.")
+                raise DomainError(f"{name} {month} 누적 실적은 이전 값 이상이어야 합니다. 당월 증가분을 입력하지 않았는지, 보고 월을 잘못 선택하지 않았는지 확인해 주세요.")
             previous = actual
             goal = step_goal(step, month) if step else percent(row.get("goal"))
             if require_explanations and month <= cutoff and goal is not None and actual < goal and project.get('_reporting',{}).get(month,{}).get('status') not in ('submitted','approved'):

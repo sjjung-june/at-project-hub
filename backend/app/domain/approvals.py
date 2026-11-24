@@ -1,5 +1,5 @@
 from copy import deepcopy
-from datetime import datetime, timezone
+from .. import clock
 from unicodedata import normalize
 from uuid import uuid4
 from .plans import percent, period, totals, validate_plan, validate_reports, weighted
@@ -9,7 +9,7 @@ FIELDS = "id title team po pm members type tech special status background kpi pl
 
 
 def timestamp():
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return clock.timestamp()
 
 
 def snapshot(project):

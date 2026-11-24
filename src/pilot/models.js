@@ -36,3 +36,18 @@ export function projectFormErrors(project,Plan){
 }
 
 export const canEdit=(project,actor)=>['at-head','system-admin'].includes(actor.role)||actor.role==='team-lead'&&actor.team===project.team||project._ownerId===actor.id||(project._memberIds||[]).includes(actor.id);
+
+// A missed month stays visible even when a later month's target is met.
+export function reportTasks(project,Plan,asOf=Plan.monthNow()){
+  if(project.archivedAt||project.status==='보류')return [];
+  const calculated=Plan.withStepTotals(clone(project));
+  return Plan.periodMonths(project.startDate,project.endDate).filter(m=>m<=asOf).map(month=>{
+    const state=project._reporting?.[month]?.status||'draft';
+    const missing=Plan.percent(calculated.monthly?.[month]?.actual)===null;
+    return {month,state,missing,past:month<asOf,label:state==='returned'?'보완 요청':locked(project,month)?statusLabel[state]:missing?'실적 미입력':'저장됨 · 제출 필요'};
+  });
+}
+export function preferredReportMonth(project,Plan){
+  const tasks=reportTasks(project,Plan);
+  return tasks.find(t=>!locked(project,t.month)&&(t.missing||t.state==='returned'))?.month||tasks.at(-1)?.month||project.startDate.slice(0,7);
+}
