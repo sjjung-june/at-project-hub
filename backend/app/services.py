@@ -28,6 +28,27 @@ def sync_requests(project):
     return project
 
 
+def audit_details(before, after, action):
+    details={'changes': approvals.changes(before,after) if before else []}
+    if not before:return details
+    reports=[]
+    for kind in ('stepReports','monthly'):
+        a,b=before.get(kind,{}),after.get(kind,{})
+        if kind=='stepReports':
+            groups=[(step_id,a.get(step_id,{}),b.get(step_id,{})) for step_id in a.keys()|b.keys()]
+        else:groups=[('',a,b)]
+        for step_id,old,new in groups:
+            for month in old.keys()|new.keys():
+                for field in ('actual','reason','catchup'):
+                    previous,current=old.get(month,{}).get(field),new.get(month,{}).get(field)
+                    if previous!=current:reports.append({'field':'.'.join(filter(None,[kind,step_id,month,field])),'before':previous,'after':current})
+    if reports:details['reportChanges']=reports
+    if action=='attachment_uploaded':details['attachment']=after.get('_lastAttachment')
+    if before.get('_reporting',{})!=after.get('_reporting',{}):
+        details['reportingChanges']={month:{'before':before.get('_reporting',{}).get(month),'after':state} for month,state in after.get('_reporting',{}).items() if before.get('_reporting',{}).get(month)!=state}
+    return details
+
+
 class ProjectService:
     def __init__(self, pool):
         self.pool = pool
@@ -54,7 +75,7 @@ class ProjectService:
             conn.execute("INSERT INTO projects(id,title,team,revision,document) VALUES(%s,%s,%s,%s,%s)", [project["id"], project["title"], project["team"], project["_revision"], Jsonb(project)])
         for request in project.get("_changeRequests", []):
             conn.execute("INSERT INTO change_requests(id,project_id,status,document) VALUES(%s,%s,%s,%s) ON CONFLICT(id) DO UPDATE SET status=EXCLUDED.status,document=EXCLUDED.document", [request["id"], project["id"], request["status"], Jsonb(request)])
-        conn.execute("INSERT INTO audit_events(id,project_id,action,actor,before_document,after_document,details) VALUES(%s,%s,%s,%s,%s,%s,%s)", [str(uuid4()), project["id"], action, Jsonb(actor.model_dump()), Jsonb(before) if before else None, Jsonb(project), Jsonb({"changes": approvals.changes(before, project) if before else []})])
+        conn.execute("INSERT INTO audit_events(id,project_id,action,actor,before_document,after_document,details) VALUES(%s,%s,%s,%s,%s,%s,%s)", [str(uuid4()), project["id"], action, Jsonb(actor.model_dump()), Jsonb(before) if before else None, Jsonb(project), Jsonb(audit_details(before, project, action))])
         return project
 
     def create(self, payload, actor):

@@ -106,7 +106,11 @@ def test_P01_multiyear_evidence_submit_review_freeze_and_plan_change(pilot):
     assert stats['counts']['approved']==1
     assert client.get('/api/statistics?month=2025-01').json()['counts']['late']==1
     assert client.get('/api/statistics?month=2025-02').json()['counts']['onTarget']==1
-    assert list(root.iterdir()) and client.get(f'/api/projects/{pid}/history').json()['events']
+    events=client.get(f'/api/projects/{pid}/history').json()['events']
+    assert list(root.iterdir()) and events
+    assert any(e['action']=='reports_saved' and e['details'].get('reportChanges') for e in events)
+    assert any(e['action']=='attachment_uploaded' and e['details']['attachment']['id']==aid for e in events)
+    assert any(e['action']=='report_reviewed' and e['details'].get('reportingChanges') for e in events)
 
 
 def test_P02_return_correct_and_resubmit_preserves_old_submission(pilot):
