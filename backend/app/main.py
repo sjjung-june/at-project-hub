@@ -11,6 +11,7 @@ from .auth import make_jwks
 from .errors import DomainError
 from .api.projects import router
 from .api.pilot import router as pilot_router
+from .request_limits import UploadBodyLimit
 
 
 def create_app(settings=None, pool=None):
@@ -29,6 +30,7 @@ def create_app(settings=None, pool=None):
                 pool.close()
 
     app = FastAPI(title="AT Project Hub API", version="0.1.0", lifespan=lifespan)
+    app.add_middleware(UploadBodyLimit,max_bytes=settings.attachment_max_bytes+1024*1024)
     app.state.settings = settings
     app.state.pool = pool
     app.state.jwks = make_jwks(settings)

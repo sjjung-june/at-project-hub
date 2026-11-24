@@ -94,6 +94,12 @@ def test_P01_multiyear_evidence_submit_review_freeze_and_plan_change(pilot):
     assert p['monthly']['2024-12']['actual']==20 # current-plan recalculation is distinguished
     old=client.get(f'/api/projects/{pid}/submissions?month=2024-12').json()['submissions'][0]['snapshot']
     assert old==frozen
+    import psycopg
+    from app.reporting import ReportingService
+    with pytest.raises(psycopg.Error,match='immutable'):
+        with app.state.pool.connection() as conn:conn.execute("UPDATE monthly_submissions SET snapshot='{}' WHERE id=%s",[sid])
+    with pytest.raises(psycopg.Error,match='retained'):
+        with app.state.pool.connection() as conn:conn.execute('DELETE FROM monthly_submissions WHERE id=%s',[sid])
     stats=client.get('/api/statistics?month=2024-12').json()
     assert stats['items'][0]['actual']==40
     assert stats['items'][0]['basis']=='approved_snapshot'

@@ -10,7 +10,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     services:
       postgres:
         image: postgres:17-alpine
@@ -38,8 +38,19 @@ jobs:
       - name: Build React components
         run: npm run build
       - name: Verify committed bundle
-        run: git diff --exit-code -- dist/components.js
+        run: git diff --exit-code -- dist/components.js dist/pilot.js
       - name: Run tests
         run: node --test tests/*.test.cjs
       - name: PostgreSQL integration tests
         run: npm run test:db
+      - name: Start disposable full stack
+        env:
+          POSTGRES_PASSWORD: ci_pilot_password
+        run: |
+          cp backend/.env.example backend/.env
+          docker compose --env-file backend/.env -f deploy/pilot.compose.yaml up --build -d --wait
+      - name: Web, proxy, API and PostgreSQL pilot smoke
+        run: python3 deploy/smoke.py
+      - name: Stop disposable pilot stack
+        if: always()
+        run: docker compose --env-file backend/.env -f deploy/pilot.compose.yaml down -v

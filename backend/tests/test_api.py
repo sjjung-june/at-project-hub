@@ -66,3 +66,10 @@ def test_signed_oidc_identity_and_invalid_tokens():
             assert client.get("/api/projects", headers={"Authorization": "Bearer " + bad}).status_code == 401
         forged = jwt.encode({**claims, "at_role": "at-head"}, "attacker-secret-that-is-at-least-32-characters", algorithm="HS256")
         assert client.get("/api/projects", headers={"Authorization": "Bearer " + forged}).status_code == 401
+
+
+def test_upload_body_limit_stops_oversized_request_before_spooling():
+    app=create_app(Settings(_env_file=None,app_env="test",attachment_max_bytes=1024))
+    with TestClient(app) as client:
+        response=client.post('/api/projects/id/attachments',content=b'x',headers={'Content-Type':'multipart/form-data; boundary=x','Content-Length':str(2*1024*1024)})
+        assert response.status_code==413

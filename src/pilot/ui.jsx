@@ -1,0 +1,11 @@
+import styled,{createGlobalStyle} from 'styled-components';
+export const Global=createGlobalStyle`*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,'Noto Sans KR',sans-serif;background:#f3f6fb;color:#20314d;font-size:16px;line-height:1.6}button,input,textarea,select{font-family:inherit}h1,h2,h3,p{margin-top:0}h1{font-size:28px}h2{font-size:20px}h3{font-size:17px}a{color:#375de0}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #aebeff;outline-offset:2px}`;
+export const Shell=styled.div`max-width:1440px;margin:auto;padding:24px;@media(max-width:640px){padding:14px}`;
+export const Header=styled.header`display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px;border-bottom:1px solid #dbe4ef;padding-bottom:16px;`;
+export const Layout=styled.div`display:grid;grid-template-columns:310px minmax(0,1fr);gap:22px;@media(max-width:950px){grid-template-columns:1fr}`;
+export const ProjectButton=styled.button`width:100%;display:block;text-align:left;border:1px solid ${p=>p.$active?'#375de0':'#dbe4ef'};border-radius:10px;padding:14px;margin:10px 0;background:${p=>p.$active?'#eef2ff':'white'};color:#20314d;cursor:pointer;font:inherit;strong,small{display:block}small{color:#65758b;margin-top:5px}`;
+export const Tabs=styled.nav`display:flex;gap:8px;flex-wrap:wrap;margin:16px 0;`;
+export const Select=styled.select`font:inherit;font-size:14px;padding:10px 12px;max-width:100%;border:1px solid #dbe4ef;background:#fff;border-radius:8px;color:#20314d;`;
+export const Alert=styled.div`padding:14px 16px;margin-bottom:16px;border-radius:10px;background:${p=>p.$error?'#fff0ed':'#edf5ff'};border:1px solid ${p=>p.$error?'#edbcb5':'#c8d9f6'};font-size:14px;`;
+export const Metrics=styled.div`display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0;>div{background:white;border:1px solid #dbe4ef;border-radius:10px;padding:16px}strong,span{display:block}strong{font-size:26px}span{font-size:14px;color:#65758b}@media(max-width:700px){grid-template-columns:1fr 1fr}`;
+export const Diff=styled.pre`max-height:260px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:#f3f6fb;padding:14px;border-radius:8px;font-size:13px;`;
