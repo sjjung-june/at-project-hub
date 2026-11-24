@@ -2,6 +2,17 @@ export const clone=x=>JSON.parse(JSON.stringify(x));
 export const locked=(project,month)=>['submitted','approved'].includes(project._reporting?.[month]?.status);
 export const statusLabel={draft:'작성 중',submitted:'제출·검토 대기',approved:'확정',returned:'보완 요청'};
 export function contributionReportPatch(project,rows,Plan){
+  if(!Plan.isWeighted(project)){
+    const monthly={};
+    for(const [month,row] of Object.entries(rows._overall||{})){
+      if(locked(project,month))continue;
+      const previous=project.monthly?.[month]||{};
+      const value=Object.hasOwn(row,'actual')?row.actual:previous.actual;
+      if(value!==''&&value!=null&&Plan.percent(value)===null)throw new Error('누적 실적은 0~100%여야 합니다.');
+      monthly[month]={actual:value===''||value==null?null:Number(value),reason:row.reason??previous.reason??'',catchup:row.catchup??previous.catchup??''};
+    }
+    return {monthly};
+  }
   const patch={};
   for(const [stepId,months] of Object.entries(rows)){
     const step=project.steps.find(s=>s.id===stepId);if(!step)throw new Error('등록되지 않은 Step입니다.');
@@ -23,3 +34,5 @@ export function projectFormErrors(project,Plan){
   if(!project.tech.length)errors.push('대상 Tech를 선택해 주세요.');
   return errors.concat(Plan.validatePlan(project).map(e=>e.message));
 }
+
+export const canEdit=(project,actor)=>['at-head','system-admin'].includes(actor.role)||actor.role==='team-lead'&&actor.team===project.team||project._ownerId===actor.id||(project._memberIds||[]).includes(actor.id);

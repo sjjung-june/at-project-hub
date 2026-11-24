@@ -135,3 +135,15 @@ TEST_DATABASE_URL=postgresql://user:password@127.0.0.1:5432/test_db python -m py
 DB 테스트는 별도 스키마를 생성·제거합니다. GitHub Actions는 PostgreSQL 17에서 과제 저장, 승인 중 실적 보존, 동시 수정 충돌, 트랜잭션 원복, 감사 이력 변경 차단을 실행하고 백엔드 Docker 이미지를 빌드합니다. DB 주소가 없으면 DB 테스트만 건너뜁니다.
 
 구조 참고: [FastAPI APIRouter](https://fastapi.tiangolo.com/tutorial/bigger-applications/), [Psycopg 연결 풀과 트랜잭션](https://www.psycopg.org/psycopg3/docs/advanced/pool.html).
+
+## 파일럿 보완 기능
+
+- `/api/me`, `/api/statistics?month=YYYY-MM`: 인증 사용자와 동일 월 통계. 확정 실적은 보존된 당시 계획 기준으로 집계합니다.
+- `POST /api/projects/{id}/attachments`, `GET .../attachments`, `GET .../attachments/{file_id}/download`: 과제·Step·보고 월 증빙 및 새 버전. 업로드는 multipart `file`, 선택 `step_id`/`month`/`replaces_id`, `If-Match`를 사용합니다.
+- `POST /api/projects/{id}/months/{month}/submit`: 해당 월 실적 제출과 계획·실적·증빙 스냅샷. 완료 증빙 필수 Step은 파일을 확인합니다.
+- `GET /api/projects/{id}/submissions`: 제출/보완/확정 내역.
+- `POST /api/projects/{id}/submissions/{sid}/review`: `{decision: "approved" | "returned", comment: 검토의견}`. 같은 팀장/담당장 검토, 자기 확정 금지.
+
+`002_pilot_reporting.sql`, `003_submission_retention.sql`을 추가했습니다. 기존 DB에도 `python -m app.db`를 다시 실행해야 합니다. 파일 저장 위치는 `ATTACHMENT_DIR`, 기본 한도는 `ATTACHMENT_MAX_BYTES`입니다. Docker 이미지는 `/data/attachments`를 사용하며 영속 볼륨을 연결해야 합니다. 현재 구현은 파일 볼륨 저장소이며 HCP 오브젝트 스토리지·악성코드 검사 연결은 후속 작업입니다.
+
+백엔드 단독 ZIP에는 공용 프런트엔드가 포함되지 않습니다. 전체 작업공간은 전체 저장소의 `deploy/pilot.compose.yaml`로 실행합니다. [파일럿 검증 노트](../docs/pilot-validation.md)에 시나리오와 실제 사용자 파일럿 전 조건을 정리했습니다.

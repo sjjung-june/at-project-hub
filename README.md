@@ -69,7 +69,7 @@ Node.js 22 환경에서 프로젝트 폴더에서 실행합니다. 추가 패키
 node --test
 ```
 
-제공 시점에 자동 검증 89건을 통과했습니다. 승인 전 원본 유지, 승인 대기 중 실적 보존, 자기 승인 제한, 보관·복구 및 요청 중복 방지도 실제 화면에서 점검했습니다.
+기존 계산·승인·요청 흐름의 자동 검증을 유지합니다. 승인 전 원본 유지, 승인 대기 중 실적 보존, 자기 승인 제한, 보관·복구 및 요청 중복 방지도 실제 화면에서 점검했습니다.
 
 ## Step 계산과 기존 데이터
 
@@ -91,3 +91,7 @@ node --test
 신규 백엔드 개발은 [`backend/`](backend/README.md)에서 진행합니다. Python 3.12+, FastAPI, PostgreSQL 연결 풀, 독립 SQL 마이그레이션, 과제·실적·승인·감사 이력 API, OIDC JWT 검증 연결부, Docker 실행 및 별도 CI를 제공합니다. `backend/` 폴더만 복사해 독립 실행할 수 있으며 Node.js와 프런트엔드 소스에 의존하지 않습니다. 기존 `server/`는 이전 Node.js 프레임 참고용입니다. API 개발 시 기본 대상은 FastAPI입니다.
 
 HCP 이전을 맡을 사내 에이전트용 [Docker·Jenkins 마이그레이션 인수인계 노트](backend/HCP_MIGRATION_NOTES.md)를 제공합니다. HCP 원본 템플릿에서 확인할 사항과 현재 코드의 연결 작업을 구분해 기록했습니다.
+
+## 공용 작업공간과 파일럿 검증
+
+신규 `dist/pilot.html`은 공용 FastAPI에 연결해 과제 등록, Step 실적, 첨부 증빙, 제출·검토·확정, 변경 승인·이력을 처리하는 React/styled-components 작업공간입니다. 기존 `index.html`은 브라우저 저장 시연으로 유지합니다. 전체 실행은 `deploy/pilot.compose.yaml`, 시나리오·발견 문제·출시 전 조건은 [파일럿 검증 노트](docs/pilot-validation.md)에 정리했습니다. 외부 정적 시연 사이트에 운영 DB/SSO가 자동 연결된 상태는 아닙니다.
