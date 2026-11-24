@@ -1,7 +1,8 @@
 // Explicit adapter for the future shared-DB UI. The published demo still uses local storage.
-export function createApiClient({baseUrl='/api',fetchImpl=fetch}={}){
+export function createApiClient({baseUrl='/api',fetchImpl=fetch,getAccessToken}={}){
   async function request(path,{method='GET',revision,body}={}){
     const headers={Accept:'application/json'};
+    if(getAccessToken){const token=await getAccessToken();if(token)headers.Authorization=`Bearer ${token}`;}
     if(body!==undefined)headers['Content-Type']='application/json';
     if(revision!==undefined)headers['If-Match']=`"${revision}"`;
     const response=await fetchImpl(baseUrl+path,{method,headers,credentials:'same-origin',...(body===undefined?{}:{body:JSON.stringify(body)})});

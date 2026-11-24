@@ -85,3 +85,7 @@ node --test
 ## PostgreSQL 프레임
 
 [설치 및 API 설명](docs/postgresql-setup.md)에 DB 스키마, 로컬 실행, 인증 연결 지점, 데이터 단위와 테스트 방법을 정리했습니다. 배포 화면은 브라우저 저장을 사용하며, PostgreSQL API와 연결할 클라이언트를 별도로 제공합니다.
+
+## 분리된 FastAPI 백엔드
+
+신규 백엔드 개발은 [`backend/`](backend/README.md)에서 진행합니다. Python 3.12+, FastAPI, PostgreSQL 연결 풀, 독립 SQL 마이그레이션, 과제·실적·승인·감사 이력 API, OIDC JWT 검증 연결부, Docker 실행 및 별도 CI를 제공합니다. `backend/` 폴더만 복사해 독립 실행할 수 있으며 Node.js와 프런트엔드 소스에 의존하지 않습니다. 기존 `server/`는 이전 Node.js 프레임 참고용입니다. API 개발 시 기본 대상은 FastAPI입니다.

@@ -1,3 +1,7 @@
+# 기본 개발 대상: FastAPI
+
+독립 실행과 신규 개발은 [backend/README.md](../backend/README.md)를 참고하세요. 아래는 이전 Node.js 프레임의 실행 설명입니다.
+
 # PostgreSQL 기본 프레임
 
 현재 배포 사이트는 브라우저 저장 시연입니다. 이 프레임은 별도의 Node.js API 서버와 PostgreSQL을 사내 환경에 설치할 수 있도록 제공합니다. 배포 사이트에 운영 DB가 자동 연결되거나 브라우저 데이터가 자동 업로드되지 않습니다.
