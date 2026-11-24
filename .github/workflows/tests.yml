@@ -11,6 +11,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: at_project_hub_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test_user -d at_project_hub_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://test_user:test_password@127.0.0.1:5432/at_project_hub_test
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -25,3 +41,5 @@ jobs:
         run: git diff --exit-code -- dist/components.js
       - name: Run tests
         run: node --test tests/*.test.cjs
+      - name: PostgreSQL integration tests
+        run: npm run test:db

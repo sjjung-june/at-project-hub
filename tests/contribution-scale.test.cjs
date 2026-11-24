@@ -1,0 +1,10 @@
+const test=require('node:test');const assert=require('node:assert/strict');const P=require('../dist/plan-model.js');
+test('Step weight is the displayed maximum and contributions add without applying weight twice',()=>{
+ const steps=[{id:'a',name:'분석',weight:40,startDate:'2026-01-01',endDate:'2026-02-28',monthly:{'2026-01':{goal:P.normalizedContribution(20,40)},'2026-02':{goal:P.normalizedContribution(40,40)}}},{id:'b',name:'검증',weight:60,startDate:'2026-01-01',endDate:'2026-02-28',monthly:{'2026-01':{goal:P.normalizedContribution(30,60)},'2026-02':{goal:P.normalizedContribution(60,60)}}}];
+ const project={startDate:'2026-01-01',endDate:'2026-02-28',planMode:'cumulative-percent-v1',stepPlanMode:'weighted-steps-v1',steps};
+ assert.deepEqual(P.validatePlan(project),[]);assert.equal(P.aggregateSteps(project)['2026-01'].goal,50);assert.equal(P.aggregateSteps(project)['2026-02'].goal,100);
+ assert.equal(P.contribution(100,40),40);assert.equal(P.contribution(50,60),30);assert.equal(P.normalizedContribution('',40),'');assert.equal(P.contribution(null,40),null);
+ steps[0].monthly['2026-01'].goal=P.normalizedContribution(41,40);assert.ok(P.validatePlan(project).some(e=>e.message.includes('0~40%')));
+ steps[0].monthly['2026-01'].goal=P.normalizedContribution(20,40);steps[0].monthly['2026-02'].goal=P.normalizedContribution(39,40);assert.ok(P.validatePlan(project).some(e=>e.message.includes('40%여야')));
+});
+test('actual contributions keep unknown vs zero, per-Step caps, and existing saved progress',()=>{assert.equal(P.normalizedContribution(0,40),0);assert.equal(P.normalizedContribution(40,40),100);assert.equal(P.contribution(80,40),32);const s={id:'a',name:'Step',weight:40,startDate:'2026-01-01',endDate:'2026-02-28',monthly:{'2026-01':{goal:50},'2026-02':{goal:100}}};const p={startDate:s.startDate,endDate:s.endDate,steps:[s]};const errors=P.validateStepReports(p,{a:{'2026-01':{actual:P.normalizedContribution(41,40)}}},'2026-01');assert.ok(errors.some(e=>e.message.includes('0~40%')));});

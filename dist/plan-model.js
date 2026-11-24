@@ -67,6 +67,8 @@
   function issue(month, field, message) { return { month, field, message }; }
 
   const isWeighted = project => project?.stepPlanMode === 'weighted-steps-v1';
+  const contribution = (value, weight) => value === '' || value == null ? value : round(Number(value)*Number(weight)/100);
+  const normalizedContribution = (value, weight) => value === '' ? '' : Number(weight)>0 ? Number(value)/Number(weight)*100 : NaN;
   const clone = value => JSON.parse(JSON.stringify(value));
   function validateSteps(project) {
     const errors = [], ids = new Set();
@@ -87,8 +89,10 @@
         add(step, '', `${name || 'Step'} 기간은 과제 추진 일정 안에 있어야 합니다.`);
         continue;
       }
-      for (const error of validatePlan({startDate:step.startDate,endDate:step.endDate,monthly:step.monthly}))
-        add(step, error.month, `${name}: ${error.message}`);
+      for (const error of validatePlan({startDate:step.startDate,endDate:step.endDate,monthly:step.monthly})) {
+        const message=error.message.replace('0~100%', `0~${step.weight}%`).replace('100%여야', `${step.weight}%여야`);
+        add(step, error.month, `${name}: ${message}`);
+      }
     }
     if (Math.abs(total - 100) > 1e-9) add(null, '', `Step 비중 합계는 100%여야 합니다. 현재 ${round(total)}%입니다.`);
     return errors;
@@ -135,7 +139,7 @@
         const actual = stepActual(step,month,reports);
         const add = (field,message) => errors.push({stepId:step.id,month,field,message:`${step.name} · ${month} ${message}`});
         if (hasValue(row.actual) && month > cutoff) add('actual','미래 월의 실적은 입력할 수 없습니다.');
-        if (hasValue(row.actual) && percent(row.actual) === null) add('actual','누적 실적은 0~100%여야 합니다.');
+        if (hasValue(row.actual) && percent(row.actual) === null) add('actual',`누적 실적은 0~${step.weight}%여야 합니다.`);
         if (actual === null) continue;
         if (previous !== null && actual < previous) add('actual','누적 실적은 이전 입력 값 이상이어야 합니다.');
         previous = actual;
@@ -243,5 +247,5 @@
     return result;
   }
 
-  return Object.freeze({ today, monthNow, months, periodMonths, years, isDate, hasValue, percent, isWeighted, validateSteps, stepGoal, stepActual, aggregateSteps, withStepTotals, validateStepReports, validatePlan, validateReports, summary });
+  return Object.freeze({ today, monthNow, months, periodMonths, years, isDate, hasValue, percent, contribution, normalizedContribution, isWeighted, validateSteps, stepGoal, stepActual, aggregateSteps, withStepTotals, validateStepReports, validatePlan, validateReports, summary });
 });
