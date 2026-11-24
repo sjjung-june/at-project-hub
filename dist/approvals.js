@@ -37,7 +37,7 @@
           record._baseline = clone(previous._baseline || record._baseline || ApprovalModel.snapshot(previous));
           const reportChanges = OperationsModel.changes(previous, record).filter(change => /\.actual$|\.reason$|\.catchup$/.test(change.field));
           // Moving preserved reports into/out of the archive is covered by the approval event.
-          if (reportChanges.length && !newlyApproved) record._audit.push(event('실적 변경', { changes: reportChanges, before: clone(previous.monthly || {}), after: clone(record.monthly || {}) }));
+          if (reportChanges.length && !newlyApproved) record._audit.push(event('실적 변경', { changes: reportChanges, before: clone(PlanModel.isWeighted(previous)?{monthly:previous.monthly,stepReports:previous.stepReports}:previous.monthly || {}), after: clone(PlanModel.isWeighted(record)?{monthly:record.monthly,stepReports:record.stepReports}:record.monthly || {}) }));
           if (JSON.stringify(previous.monthlyArchive || {}) !== JSON.stringify(record.monthlyArchive || {})) record._audit.push(event('기간 외 월별 기록 보관·복원', { requestId: newlyApproved?.id || '', before: clone(previous.monthlyArchive || {}), after: clone(record.monthlyArchive || {}), changes: [] }));
           const previousRequests = previous._reportRequests || [];
           for (const request of record._reportRequests || []) {
@@ -74,7 +74,7 @@
   function baselineMarkup(project) {
     const baseline = project._baseline;
     if (!baseline) return '<p class="integration-help">기능 도입 전 과제입니다. 첫 변경 요청 시 현재 계획을 최초 보존 기준으로 기록합니다.</p>';
-    const original = { ...baseline, monthly: Object.fromEntries(Object.entries(baseline.monthly || {}).map(([month, row]) => [month, { ...row, actual: project.monthly?.[month]?.actual ?? project.monthlyArchive?.[month]?.actual }])) };
+    const original = { ...baseline, stepReports:project.stepReports, monthly: Object.fromEntries(Object.entries(baseline.monthly || {}).map(([month, row]) => [month, { ...row, actual: (!PlanModel.isWeighted(baseline)&&PlanModel.isWeighted(project)?project.legacyAggregateReports?.monthly?.[month]?.actual:project.monthly?.[month]?.actual) ?? project.monthlyArchive?.[month]?.actual }])) };
     const initial = PlanModel.summary(original), current = progress(project);
     return `<div class="baseline-metrics"><div><span>최초 보존 계획 기준</span><strong>${esc(initial.label)}</strong><p>${esc(initial.note)}</p></div><div><span>현재 승인 계획 기준</span><strong>${esc(current.label)}</strong><p>${esc(current.note)}</p></div></div><details class="baseline-details"><summary>최초 보존 계획과 현재 계획 비교</summary>${diffMarkup(ApprovalModel.changes(baseline, project))}</details>`;
   }

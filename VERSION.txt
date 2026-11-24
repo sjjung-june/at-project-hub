@@ -1,4 +1,4 @@
 AT Project Hub
-Version date: 2026-11-23
-Source commit: 6bb04890cfea1fe1489f27437fd77663e2461c56
-Packaged at (UTC): 2026-11-22T23:05:09.875706+00:00
+Version: 2.0.0
+Version date: 2026-11-24
+React + styled-components Step plans and weighted reporting

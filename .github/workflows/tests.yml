@@ -17,5 +17,11 @@ jobs:
         with:
           node-version: '22'
           package-manager-cache: false
+      - name: Install dependencies
+        run: npm ci
+      - name: Build React components
+        run: npm run build
+      - name: Verify committed bundle
+        run: git diff --exit-code -- dist/components.js
       - name: Run tests
         run: node --test tests/*.test.cjs

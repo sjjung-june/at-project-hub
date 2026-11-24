@@ -66,6 +66,88 @@
 
   function issue(month, field, message) { return { month, field, message }; }
 
+  const isWeighted = project => project?.stepPlanMode === 'weighted-steps-v1';
+  const clone = value => JSON.parse(JSON.stringify(value));
+  function validateSteps(project) {
+    const errors = [], ids = new Set();
+    const steps = Array.isArray(project.steps) ? project.steps : [];
+    const add = (step, month, message) => errors.push({ field: 'steps', stepId: step?.id, month, message });
+    if (!steps.length) add(null, '', 'Step을 한 개 이상 등록해 주세요.');
+    let total = 0;
+    for (const step of steps) {
+      if (!step.id || ids.has(step.id)) add(step, '', 'Step 식별자가 없거나 중복됩니다.');
+      ids.add(step.id);
+      const name = String(step.name || '').trim();
+      if (!name) add(step, '', 'Step 이름을 입력해 주세요.');
+      const weight = percent(step.weight);
+      if (weight === null || weight <= 0) add(step, '', `${name || 'Step'} 비중은 0 초과 100% 이하로 입력해 주세요.`);
+      else total += weight;
+      if (!isDate(step.startDate) || !isDate(step.endDate) || step.startDate > step.endDate
+        || step.startDate < project.startDate || step.endDate > project.endDate) {
+        add(step, '', `${name || 'Step'} 기간은 과제 추진 일정 안에 있어야 합니다.`);
+        continue;
+      }
+      for (const error of validatePlan({startDate:step.startDate,endDate:step.endDate,monthly:step.monthly}))
+        add(step, error.month, `${name}: ${error.message}`);
+    }
+    if (Math.abs(total - 100) > 1e-9) add(null, '', `Step 비중 합계는 100%여야 합니다. 현재 ${round(total)}%입니다.`);
+    return errors;
+  }
+  function stepGoal(step, month) {
+    if (month < step.startDate?.slice(0,7)) return 0;
+    if (month > step.endDate?.slice(0,7)) return 100;
+    return percent(step.monthly?.[month]?.goal);
+  }
+  function stepActual(step, month, reports = {}) {
+    if (month < step.startDate?.slice(0,7)) return 0;
+    const rows = reports[step.id] || {};
+    if (hasValue(rows[month]?.actual)) return percent(rows[month].actual);
+    return Object.keys(rows).some(m => m >= step.startDate.slice(0,7) && m < month && percent(rows[m]?.actual) === 100) ? 100 : null;
+  }
+  function aggregateSteps(project, reports = project.stepReports || {}) {
+    const monthly = {};
+    for (const month of periodMonths(project.startDate, project.endDate)) {
+      const steps = project.steps || [];
+      const goals = steps.map(step => stepGoal(step, month));
+      const actuals = steps.map(step => stepActual(step, month, reports));
+      const started = steps.some(step => month >= step.startDate?.slice(0,7));
+      const row = {};
+      if (goals.every(value => value !== null)) row.goal = round(steps.reduce((sum, step, i) => sum + Number(step.weight) * goals[i] / 100, 0));
+      if (started && actuals.every(value => value !== null)) row.actual = round(steps.reduce((sum, step, i) => sum + Number(step.weight) * actuals[i] / 100, 0));
+      const delayed = steps.filter((step,i) => actuals[i] !== null && goals[i] !== null && actuals[i] < goals[i]);
+      for (const field of ['reason','catchup']) {
+        const text = delayed.filter(step => reports[step.id]?.[month]?.[field]).map(step => `${step.name}: ${reports[step.id][month][field]}`).join(' / ');
+        if (text) row[field] = text;
+      }
+      monthly[month] = row;
+    }
+    return monthly;
+  }
+  function withStepTotals(project, reports = project.stepReports || {}) {
+    return isWeighted(project) ? { ...project, stepReports:clone(reports), monthly:aggregateSteps(project,reports) } : project;
+  }
+  function validateStepReports(project, reports = {}, asOf = monthNow()) {
+    const errors = [], cutoff = normalizeAsOf(asOf);
+    for (const step of project.steps || []) {
+      let previous = null;
+      for (const month of periodMonths(project.startDate,project.endDate).filter(m => m >= step.startDate.slice(0,7))) {
+        const row = reports[step.id]?.[month] || {};
+        const actual = stepActual(step,month,reports);
+        const add = (field,message) => errors.push({stepId:step.id,month,field,message:`${step.name} · ${month} ${message}`});
+        if (hasValue(row.actual) && month > cutoff) add('actual','미래 월의 실적은 입력할 수 없습니다.');
+        if (hasValue(row.actual) && percent(row.actual) === null) add('actual','누적 실적은 0~100%여야 합니다.');
+        if (actual === null) continue;
+        if (previous !== null && actual < previous) add('actual','누적 실적은 이전 입력 값 이상이어야 합니다.');
+        previous = actual;
+        if (month <= cutoff && actual < stepGoal(step,month)) {
+          if (!String(row.reason || '').trim()) add('reason','지연 사유를 입력해 주세요.');
+          if (!String(row.catchup || '').trim()) add('catchup','Catch Up Plan을 입력해 주세요.');
+        }
+      }
+    }
+    return errors;
+  }
+
   function validatePlan(project) {
     project = project || {};
     const errors = [];
@@ -73,6 +155,7 @@
     if (!isDate(project.endDate)) errors.push(issue('', 'endDate', '과제 종료일을 올바른 날짜로 입력해 주세요.'));
     if (errors.length) return errors;
     if (project.endDate < project.startDate) return [issue('', 'endDate', '종료일은 시작일과 같거나 이후여야 합니다.')];
+    if (isWeighted(project)) return validateSteps(project);
     const active = periodMonths(project.startDate, project.endDate);
     const records = project.monthly || {};
     let previous = null;
@@ -98,6 +181,7 @@
 
   function validateReports(project, monthly, asOf = monthNow()) {
     project = project || {};
+    if (isWeighted(project)) return validateStepReports(project, project.stepReports || {}, asOf);
     const records = monthly || {};
     const cutoff = normalizeAsOf(asOf);
     const errors = [];
@@ -125,6 +209,7 @@
 
   function summary(project, asOf = monthNow()) {
     project = project || {};
+    if (isWeighted(project)) project = withStepTotals(project);
     const records = project.monthly || {};
     const result = { label: '', note: '', goal: null, actual: null, gap: null, missing: false, missingMonths: [], late: false };
     const hasPlan = hasValue(project.startDate) || hasValue(project.endDate)
@@ -158,5 +243,5 @@
     return result;
   }
 
-  return Object.freeze({ today, monthNow, months, periodMonths, years, isDate, hasValue, percent, validatePlan, validateReports, summary });
+  return Object.freeze({ today, monthNow, months, periodMonths, years, isDate, hasValue, percent, isWeighted, validateSteps, stepGoal, stepActual, aggregateSteps, withStepTotals, validateStepReports, validatePlan, validateReports, summary });
 });

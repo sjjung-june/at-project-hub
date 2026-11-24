@@ -1,0 +1,18 @@
+import styled from 'styled-components';
+export const theme = { colors:{ink:'#20314d',muted:'#65758b',border:'#dbe4ef',primary:'#375de0',soft:'#f3f6fc',danger:'#aa453c',success:'#28785e'},radius:'12px' };
+export const Stack = styled.div`display:grid;gap:20px;color:${p=>p.theme.colors.ink};font-size:16px;line-height:1.6;`;
+export const Card = styled.section`padding:22px;border:1px solid ${p=>p.theme.colors.border};border-radius:${p=>p.theme.radius};background:#fff;min-width:0;`;
+export const Row = styled.div`display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;`;
+export const Fields = styled.div`display:grid;grid-template-columns:minmax(180px,2fr) minmax(110px,.6fr) repeat(2,minmax(150px,1fr));gap:16px;margin:18px 0;@media(max-width:900px){grid-template-columns:1fr 1fr;}@media(max-width:520px){grid-template-columns:1fr;}`;
+export const Label = styled.label`display:grid;gap:6px;font-size:14px;font-weight:600;`;
+export const Input = styled.input`&&{box-sizing:border-box;width:100%;min-width:0;padding:10px 12px;border:1px solid ${p=>p.theme.colors.border};border-radius:8px;font:inherit;font-size:14px;color:${p=>p.theme.colors.ink};background:#fff;}&&:focus{outline:2px solid #aebeff;outline-offset:1px;}&&:disabled{background:#edf1f6;color:#8390a0;cursor:not-allowed;}&&[aria-invalid=true]{border-color:${p=>p.theme.colors.danger};}`;
+export const Textarea = styled.textarea`&&{font:inherit;font-size:14px;width:100%;min-height:90px;resize:vertical;padding:12px;border:1px solid ${p=>p.theme.colors.border};border-radius:8px;box-sizing:border-box;}`;
+export const Button = styled.button`&&{padding:10px 15px;border:1px solid ${p=>p.$primary?p.theme.colors.primary:p.theme.colors.border};border-radius:8px;background:${p=>p.$primary?p.theme.colors.primary:'#fff'};color:${p=>p.$primary?'#fff':p.theme.colors.ink};font:inherit;font-size:14px;font-weight:600;cursor:pointer;}&&:disabled{opacity:.5;cursor:not-allowed;}&&:focus-visible{outline:3px solid #aebeff;outline-offset:2px;}`;
+export const Badge = styled.span`display:inline-flex;padding:5px 12px;border-radius:20px;background:${p=>p.$bad?'#fff0ec':'#edf5f2'};color:${p=>p.$bad?p.theme.colors.danger:p.theme.colors.success};font-size:14px;font-weight:700;`;
+export const Note = styled.p`&&{margin:8px 0;color:${p=>p.$bad?p.theme.colors.danger:p.theme.colors.muted};font-size:14px;line-height:1.7;}`;
+export const Scroll = styled.div`width:100%;overflow-x:auto;border:1px solid ${p=>p.theme.colors.border};border-radius:10px;margin-top:14px;`;
+export const Table = styled.table`&&{border-collapse:separate;border-spacing:0;table-layout:fixed;width:100%;min-width:1080px;font-size:14px;}&& th,&& td{padding:10px 6px;border:0;border-right:1px solid #e5ebf3;border-bottom:1px solid #e5ebf3;text-align:center;white-space:normal;}&& th{background:#f3f6fc;font-weight:600;}&& th:first-child{width:110px;position:sticky;left:0;z-index:1;background:#f3f6fc;}&& tr:last-child td,&& tr:last-child th{border-bottom:0;}&& td:last-child,&& th:last-child{border-right:0;}`;
+export const Cell = styled.td`&&{background:${p=>p.$active?'#fff':'#f0f3f7'};color:${p=>p.$active?p.theme.colors.ink:'#8793a4'};}`;
+export const PercentInput = styled(Input)`&&{padding:9px 4px;text-align:center;font-variant-numeric:tabular-nums;}&&::-webkit-inner-spin-button{appearance:none;}`;
+export const Delay = styled.div`padding:16px;background:#fff8f4;border:1px solid #efd6cc;border-radius:10px;margin-top:16px;`;
+export const Pair = styled.div`display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;@media(max-width:650px){grid-template-columns:1fr;}`;

@@ -56,18 +56,18 @@
     readAnnualGoals();
     return {
       values: [...new FormData(form).entries()].map(([name, value]) => [name, String(value)]),
-      monthly: clone(draftMonthly), year: goalYear
+      monthly: clone(draftMonthly), steps: window.StepUI?.snapshot(), year: goalYear
     };
   }
 
   function reportSnapshot() {
     if (!performanceId || !document.querySelector('#performanceContent #reportGrid')) return null;
     readReport();
-    return { monthly: clone(performanceDraft), year: reportYear };
+    return { monthly: clone(performanceDraft), stepReports: PlanModel.isWeighted(project(performanceId)) ? window.StepUI?.reportSnapshot() : undefined, year: reportYear };
   }
 
   function comparable(snapshot) {
-    return snapshot ? JSON.stringify({ values: snapshot.values, monthly: snapshot.monthly }) : '';
+    return snapshot ? JSON.stringify({ values: snapshot.values, monthly: snapshot.monthly, steps: snapshot.steps, stepReports: snapshot.stepReports }) : '';
   }
 
   function stamp(snapshot, record) {
@@ -152,11 +152,12 @@
       if (element.type === 'checkbox' || element.type === 'radio') element.checked = entries.includes(element.value);
       else element.value = entries[0] ?? '';
     });
+    window.StepUI?.restore(snapshot.steps);
     draftMonthly = clone(snapshot.monthly);
     goalYear = Number(snapshot.year) || Number(PlanModel.today().slice(0, 4));
     // updatePeriod reads the visible grid before rebuilding; remove the saved
     // grid so that it cannot overwrite recovered goals from another year.
-    document.querySelector('#annualGrid').innerHTML = '';
+    if (!window.StepUI?.enabled()) document.querySelector('#annualGrid').innerHTML = '';
     updatePeriod();
     // Keep intentionally blank or incomplete draft goals, including the final month.
     draftMonthly = clone(snapshot.monthly);
@@ -184,6 +185,7 @@
       reportYear = Number(snapshot.year);
       yearSelect.value = String(reportYear);
     }
+    if (PlanModel.isWeighted(current)) StepUI.restoreReports(snapshot.stepReports);
     drawReportGrid();
     reportPreview();
     return true;
@@ -270,6 +272,7 @@
       if (target.matches('[data-report-month]') || target.id === 'reportYear' && stored.reports[performanceId]) rememberReport();
     }
   }
+  document.addEventListener('step-draft-change', event => event.detail === 'registration' ? rememberRegistration() : rememberReport());
   document.addEventListener('input', capture);
   document.addEventListener('change', capture);
 

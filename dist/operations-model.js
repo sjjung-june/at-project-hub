@@ -125,6 +125,26 @@
         if (previous !== next) result.push({ field: `monthly.${month}.${kind}`, label: `${month} ${label}`, before: previous, after: next });
       }
     }
+    const beforeSteps = before.steps || [], afterSteps = after.steps || [];
+    if ((before.stepPlanMode || '') !== (after.stepPlanMode || '')) result.push({field:'stepPlanMode',label:'Step 계획 적용',before:before.stepPlanMode || '단일 계획',after:after.stepPlanMode || '단일 계획'});
+    for (const id of new Set([...beforeSteps.map(s=>s.id), ...afterSteps.map(s=>s.id)])) {
+      const a=beforeSteps.find(s=>s.id===id), b=afterSteps.find(s=>s.id===id), name=b?.name || a?.name || id;
+      for (const [field,label] of [['name','이름'],['weight','비중 (%)'],['startDate','시작일'],['endDate','종료일']]) {
+        const previous=valueText(a?.[field]), next=valueText(b?.[field]);
+        if(previous!==next)result.push({field:`steps.${id}.${field}`,label:`${name} · ${label}`,before:previous,after:next});
+      }
+      for(const month of new Set([...Object.keys(a?.monthly||{}),...Object.keys(b?.monthly||{})])) {
+        const previous=valueText(a?.monthly[month]?.goal),next=valueText(b?.monthly[month]?.goal);
+        if(previous!==next)result.push({field:`steps.${id}.monthly.${month}.goal`,label:`${name} · ${month} 목표 (%)`,before:previous,after:next});
+      }
+    }
+    for(const id of new Set([...Object.keys(before.stepReports||{}),...Object.keys(after.stepReports||{})])) {
+      const name=afterSteps.find(s=>s.id===id)?.name || beforeSteps.find(s=>s.id===id)?.name || id;
+      for(const month of new Set([...Object.keys(before.stepReports?.[id]||{}),...Object.keys(after.stepReports?.[id]||{})]))for(const [field,label] of [['actual','실적 (%)'],['reason','지연 사유'],['catchup','Catch Up Plan']]) {
+        const previous=valueText(before.stepReports?.[id]?.[month]?.[field]),next=valueText(after.stepReports?.[id]?.[month]?.[field]);
+        if(previous!==next)result.push({field:`stepReports.${id}.${month}.${field}`,label:`${name} · ${month} ${label}`,before:previous,after:next});
+      }
+    }
     return result;
   }
 

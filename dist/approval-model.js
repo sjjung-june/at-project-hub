@@ -28,6 +28,11 @@
         ? (Array.isArray(value) ? value.map(text).sort() : [])
         : (Array.isArray(value) ? value.map(text).sort() : text(value));
     }
+    if (PlanModel.isWeighted(project)) {
+      result.stepPlanMode = 'weighted-steps-v1';
+      result.steps = (project.steps || []).map(step => ({id:text(step.id),name:text(step.name),weight:PlanModel.percent(step.weight) ?? text(step.weight),startDate:text(step.startDate),endDate:text(step.endDate),monthly:Object.fromEntries(Object.keys(step.monthly || {}).sort().map(month => [month,{goal:PlanModel.percent(step.monthly[month]?.goal) ?? text(step.monthly[month]?.goal)}]))}));
+      project = PlanModel.withStepTotals(project);
+    }
     result.archivedAt = text(project.archivedAt) || null;
     result.monthly = {};
     for (const month of Object.keys(project.monthly || {}).sort()) {
@@ -75,6 +80,11 @@
 
   function plannedProject(project, candidate) {
     const next = { ...clone(project), ...snapshot(candidate) };
+    if (PlanModel.isWeighted(candidate)) {
+      if (!PlanModel.isWeighted(project)) next.legacyAggregateReports = clone(project.legacyAggregateReports || {monthly:project.monthly || {}, monthlyArchive:project.monthlyArchive || {}, startDate:project.startDate, endDate:project.endDate});
+      // Keep removed Step IDs and out-of-period reports for audit and restoration.
+      return PlanModel.withStepTotals(next, project.stepReports || {});
+    }
     const active = new Set(PlanModel.periodMonths(next.startDate, next.endDate));
     const hasPercentReports = project.planMode === MODE;
     const current = hasPercentReports ? clone(project.monthly || {}) : {};
@@ -108,6 +118,7 @@
     if (!text(candidate.team)) throw new Error('소속 팀을 입력해 주세요.');
     if (!Array.isArray(candidate.tech) || !candidate.tech.length) throw new Error('대상 Tech를 하나 이상 선택해 주세요.');
     if (candidate.planMode !== MODE || candidate.unit !== '%') throw new Error('목표는 누적 진척률(%) 기준으로 입력해 주세요.');
+    if (PlanModel.isWeighted(project) && !PlanModel.isWeighted(candidate)) throw new Error('Step 계획을 전체 단일 계획으로 되돌릴 수 없습니다.');
     const errors = PlanModel.validatePlan(candidate);
     if (errors.length) throw new Error(errors[0].message);
     const active = PlanModel.periodMonths(candidate.startDate, candidate.endDate);
