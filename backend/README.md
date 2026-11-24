@@ -2,6 +2,10 @@
 
 프런트엔드와 독립적으로 실행·개발하는 Python 3.12+ 백엔드입니다. Node.js나 `dist/` 파일을 실행 시 참조하지 않습니다. PostgreSQL 17과 기존 JSONB 스키마를 사용하며 기존 API 주소·본문·ETag 형식을 유지합니다.
 
+## HCP 이전
+
+사내 Docker·Jenkins 템플릿으로 이관할 때는 [HCP 마이그레이션 인수인계 노트](HCP_MIGRATION_NOTES.md)를 확인합니다. 현재 실행 계약, 템플릿 확인 항목, Secret/SSO/DB 설정, Jenkins 단계, 롤백, 프런트엔드 연결과 데이터 이전의 남은 작업을 정리했습니다.
+
 ## 로컬 실행
 
 이 `backend/` 폴더로 이동합니다.

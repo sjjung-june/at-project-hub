@@ -89,3 +89,5 @@ node --test
 ## 분리된 FastAPI 백엔드
 
 신규 백엔드 개발은 [`backend/`](backend/README.md)에서 진행합니다. Python 3.12+, FastAPI, PostgreSQL 연결 풀, 독립 SQL 마이그레이션, 과제·실적·승인·감사 이력 API, OIDC JWT 검증 연결부, Docker 실행 및 별도 CI를 제공합니다. `backend/` 폴더만 복사해 독립 실행할 수 있으며 Node.js와 프런트엔드 소스에 의존하지 않습니다. 기존 `server/`는 이전 Node.js 프레임 참고용입니다. API 개발 시 기본 대상은 FastAPI입니다.
+
+HCP 이전을 맡을 사내 에이전트용 [Docker·Jenkins 마이그레이션 인수인계 노트](backend/HCP_MIGRATION_NOTES.md)를 제공합니다. HCP 원본 템플릿에서 확인할 사항과 현재 코드의 연결 작업을 구분해 기록했습니다.
