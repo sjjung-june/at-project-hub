@@ -1,7 +1,7 @@
 const test=require('node:test');const assert=require('node:assert/strict');const P=require('../dist/plan-model.js');const D=require('../dist/demo-scenarios.js');
-test('eight planned demo variants have valid cumulative plans, weights and reports across calendar boundaries',()=>{
+test('nine planned demo variants have valid cumulative plans, weights and reports across calendar boundaries',()=>{
  for(const asOf of ['2026-11','2027-01','2028-02','2028-12']){
-  const examples=D.buildExamples(asOf);assert.equal(examples.length,8);
+  const examples=D.buildExamples(asOf);assert.equal(examples.length,9);
   for(const p of examples){assert.deepEqual(P.validatePlan(p),[],p.title);assert.deepEqual(P.validateStepReports(p,p.stepReports,asOf),[],p.title);assert.equal(p.steps.reduce((a,s)=>a+s.weight,0),100);assert.equal(p.monthly[p.endMonth].goal,100);for(const rows of Object.values(p.stepReports))assert.ok(Object.keys(rows).every(m=>m<=asOf));}
  }
 });
@@ -13,7 +13,13 @@ test('missing prior month stays unknown while current month meets goal; zero and
 });
 test('reloading or adding examples never overwrites edits, duplicates IDs or modifies existing data',()=>{
  const existing=[{id:'user',title:'실제 사용자 작성',monthly:{'2026-11':{goal:30,actual:12}}}],before=JSON.stringify(existing),examples=D.buildExamples('2026-11');
- const first=D.mergeExamples(existing,examples);assert.equal(first.added,8);assert.equal(JSON.stringify(existing),before);
+ const first=D.mergeExamples(existing,examples);assert.equal(first.added,9);assert.equal(JSON.stringify(existing),before);
  first.projects[0].title='사용자가 수정한 체험 과제';first.projects[0].steps[0].name='수정한 Step';
  const next=D.mergeExamples(first.projects,D.buildExamples('2026-12'));assert.equal(next.added,0);assert.equal(next.projects[0].title,'사용자가 수정한 체험 과제');assert.equal(next.projects[0].steps[0].name,'수정한 Step');assert.deepEqual(next.projects.find(p=>p.id==='user'),existing[0]);
+});
+
+test('requested 30/70 Step plan is stored independently and sums exactly without double weighting',()=>{
+ const p=D.buildExamples('2026-11').find(p=>p.id.endsWith('step-30-70'));const months=P.periodMonths(p.startDate,p.endDate);
+ assert.deepEqual(p.steps.map(s=>months.map(m=>P.contribution(s.monthly[m].goal,s.weight))),[[0,10,20,30],[0,20,70,70]]);
+ assert.deepEqual(months.map(m=>p.monthly[m].goal),[0,30,90,100]);
 });

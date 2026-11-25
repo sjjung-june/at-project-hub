@@ -16,7 +16,7 @@
       ['scurve','HBM · 후반 집중형 목표',shift(asOf,-2),shift(asOf,3),[25,75],0,'비균등','균등 배분과 다른 후반 집중형 누적 목표입니다. 월별 목표 곡선을 비교하세요.'],
       ['zero','AI/DT · 착수 월 0% 실적',asOf,shift(asOf,3),[100],25,'0%','명시적으로 입력한 0%와 미입력의 차이를 확인하는 사례입니다.']
     ];
-    return specs.map(([code,name,start,end,weights,lag,kind,description],index)=>{
+    const projects=specs.map(([code,name,start,end,weights,lag,kind,description],index)=>{
       const project={id:`at-demo-planned-v1-${code}`,title:`[체험] ${name}`,team:['예시공정팀','예시품질팀','예시운영팀'][index%3],po:'예시 대표자',pm:`예시 PM ${index+1}`,members:'예시 공동 수행자',tech:[name.startsWith('DRAM')?'DRAM ALL':name.startsWith('HBM')?'HBM ALL':name.startsWith('NAND')?'NAND ALL':'All Tech'],type:index%2?'담당 과제':'팀 과제',special:code==='zero'?['AI','DT']:[],background:`실제 사내 과제가 아닌 테스트용 데이터입니다. ${description}`,kpi:'예시: 검증 항목 완료율 100%, 재작업 시간 20% 감소',plan:'현황 분석 → 개선안 설계 → 검증 및 적용. 월별 값은 전체 과제의 누적 진척률입니다.',status:kind==='완료'&&end<=asOf?'완료':start>asOf?'계획':'진행',startDate:start+'-01',endDate:last(end),startMonth:start,endMonth:end,unit:'%',planMode:'cumulative-percent-v1',stepPlanMode:'weighted-steps-v1',steps:[],stepReports:{},_demoScenario:{version:1,kind,description,referenceMonth:asOf}};
       const months=P.periodMonths(project.startDate,project.endDate);
       project.steps=weights.map((weight,i)=>{
@@ -38,6 +38,13 @@
       }
       return P.withStepTotals(project);
     });
+    const exact=clone(projects[0]);
+    const first=shift(asOf,-1),end=shift(asOf,2),months=P.periodMonths(first+'-01',last(end));
+    Object.assign(exact,{id:'at-demo-planned-v1-step-30-70',title:'[체험] Step별 계획 · 비중 30/70',startDate:first+'-01',endDate:last(end),startMonth:first,endMonth:end,status:'진행',tech:['All Tech'],background:'Step 1은 0·10·20·30%, Step 2는 0·20·70·70%로 계획합니다. 전체 목표는 0·30·90·100%입니다.',_demoScenario:{version:1,kind:'Step별 월간 계획',description:'사용자 요청의 30/70 비중 예시',referenceMonth:asOf}});
+    exact.steps=[{weight:30,values:[0,10,20,30]},{weight:70,values:[0,20,70,70]}].map(({weight,values},i)=>({id:`exact-step-${i+1}`,name:`Step ${i+1}`,weight,startDate:exact.startDate,endDate:exact.endDate,monthly:Object.fromEntries(months.map((m,j)=>[m,{goal:P.normalizedContribution(values[j],weight)}])),completionCriteria:'단계별 산출물 검토 완료',evidenceRequired:false}));
+    exact.stepReports=Object.fromEntries(exact.steps.map(step=>[step.id,Object.fromEntries(months.filter(m=>m<=asOf).map(m=>[m,{actual:step.monthly[m].goal}]))]));
+    return [P.withStepTotals(exact),...projects];
+
   }
   function mergeExamples(records,examples){const ids=new Set(records.map(p=>p.id));const added=examples.filter(p=>!ids.has(p.id)).map(clone);return {projects:[...added,...clone(records)],added:added.length};}
   return Object.freeze({buildExamples,mergeExamples});

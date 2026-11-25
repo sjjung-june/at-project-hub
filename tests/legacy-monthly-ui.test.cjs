@@ -23,3 +23,22 @@ test('P25 legacy single-plan monthly flow restores drafts, preserves annual edit
     assert.deepEqual(errors,[]);
   }finally{dom.window.close();}
 });
+
+test('P26 project detail exposes each Step monthly plan and the automatic sum across years',async()=>{
+  const exact=require('../dist/demo-scenarios.js').buildExamples('2026-11').find(p=>p.id.endsWith('step-30-70'));
+  const errors=[];const console=new VirtualConsole();console.on('jsdomError',e=>errors.push(e));
+  const dom=new JSDOM(html,{url:'http://localhost/',runScripts:'dangerously',pretendToBeVisual:true,virtualConsole:console,beforeParse(w){w.scrollTo=()=>{};w.localStorage.setItem('at-project-demo-v1',JSON.stringify([exact]));w.HTMLElement.prototype.scrollIntoView=()=>{};}});
+  await new Promise(resolve=>dom.window.addEventListener('load',resolve,{once:true}));
+  const {within}=require('@testing-library/dom'),user=require('@testing-library/user-event').default.setup({document:dom.window.document}),body=within(dom.window.document.body);
+  try{
+    await user.click(body.getByText(exact.title,{exact:true}));
+    const region=within(body.getByRole('region',{name:'2026년 Step별 월간 계획'}));
+    const values=name=>within(region.getByRole('row',{name})).getAllByRole('cell').map(c=>c.textContent);
+    assert.deepEqual(values(/Step 1/).slice(9),['0%','10%','20%']);assert.deepEqual(values(/Step 2/).slice(9),['0%','20%','70%']);
+    assert.deepEqual(values(/전체 목표/).slice(9),['0%','30%','90%']);
+    await user.selectOptions(body.getByLabelText('계획 조회 연도'),'2027');
+    const next=within(body.getByRole('region',{name:'2027년 Step별 월간 계획'}));
+    assert.equal(within(next.getByRole('row',{name:/전체 목표/})).getAllByRole('cell')[0].textContent,'100%');
+    assert.deepEqual(errors,[]);
+  }finally{dom.window.close();}
+});

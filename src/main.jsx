@@ -1,4 +1,5 @@
-import React from 'react';
+import React,{useState} from 'react';
+import {StepPlanMatrix} from './StepPlanMatrix';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import {MonthReport} from './pilot/App';
@@ -33,7 +34,7 @@ function AnnualReport(){const project=P.withStepTotals(reportProject,reports),su
 function Report(){const project=P.isWeighted(reportProject)?P.withStepTotals(reportProject,reports):{...reportProject,monthly:overallReports};return <Stack><Row><Button type="button" $primary={reportFocus} onClick={()=>{reportFocus=true;renderReports();}}>한 달씩 입력</Button><Button type="button" $primary={!reportFocus} onClick={()=>{reportFocus=false;year=Number(reportMonth.slice(0,4));const select=document.querySelector('#reportYear');if(select)select.value=String(year);renderReports();}}>연간 표 펼치기</Button></Row>{reportFocus?<MonthReport project={reportProject} calculated={project} reports={reports} rows={P.isWeighted(reportProject)?reports:{_overall:overallReports}} Plan={P} month={reportMonth} setMonth={value=>{reportMonth=value;renderReports();}} writable={true} submissionWorkflow={false} update={(step,m,field,value)=>{if(P.isWeighted(reportProject))updateReports(step.id,m,field,field==='actual'?normalized(value,step.weight):value);else{overallReports[m]??={};overallReports[m][field]=value;renderReports();notify('reports');}}}/>:P.isWeighted(reportProject)?<AnnualReport/>:<AggregateAnnualReport project={project}/>}</Stack>;}
 function AggregateAnnualReport({project}){const active=P.periodMonths(project.startDate,project.endDate),delayed=active.filter(m=>m.startsWith(String(year))&&m<=P.monthNow()&&P.percent(overallReports[m]?.actual)!==null&&Number(overallReports[m].actual)<Number(project.monthly[m]?.goal));const update=(m,field,value)=>{overallReports[m]??={};overallReports[m][field]=value;renderReports();notify('reports');};return <Stack><MonthTable year={year} label="전체 과제" active={m=>active.includes(m)} goal={m=>project.monthly[m]?.goal} actual={m=>overallReports[m]?.actual} input="actual" onValue={(m,value)=>update(m,'actual',value)}/>{delayed.map(m=><Delay key={m}><strong>{m} 지연 사유와 만회 계획</strong><Pair>{[['reason','지연 사유'],['catchup','Catch Up Plan']].map(([field,label])=><Label key={field}>{label}<Textarea aria-label={`전체 과제 ${m} ${label}`} value={overallReports[m]?.[field]||''} onChange={e=>update(m,field,e.target.value)}/></Label>)}</Pair></Delay>)}</Stack>;}
 function renderReports(){if(reportProject){const toolbar=document.querySelector('#performanceContent .annual-toolbar');if(toolbar)toolbar.hidden=reportFocus;mount(document.getElementById('reportGrid'),<Report/>);}}
-function StepDetail({project}){const p=P.withStepTotals(project),now=P.monthNow()>project.endDate.slice(0,7)?project.endDate.slice(0,7):P.monthNow();return <Card><strong>Step 구성 및 최근 진척률</strong><Note>비중을 적용한 전체 누적 목표와 실적은 위 계획표에서 확인할 수 있습니다.</Note>{p.steps.map(s=><Row key={s.id}><span>{s.name} · 비중 {s.weight}%</span><Note>{s.startDate} ~ {s.endDate} · 목표 {fmt(contribution(P.stepGoal(s,now),s.weight))} / 실적 {fmt(contribution(P.stepActual(s,now,p.stepReports),s.weight))}</Note></Row>)}</Card>;}
+function StepDetail({project}){const years=P.years(project.startDate,project.endDate),current=Number(P.today().slice(0,4));const [selectedYear,setSelectedYear]=useState(years.includes(current)?current:years[0]);return <Card><Row><h3>Step별 월간 계획</h3><Label>계획 조회 연도<select value={selectedYear} onChange={e=>setSelectedYear(Number(e.target.value))}>{years.map(y=><option key={y} value={y}>{y}년</option>)}</select></Label></Row><StepPlanMatrix project={project} Plan={P} year={selectedYear}/>{project.steps.map(step=><Note key={step.id}>{step.name} · 비중 {step.weight}% · {step.startDate} ~ {step.endDate}</Note>)}</Card>;}
 window.StepUI={
  init(project){dates={startDate:project.startDate||'',endDate:project.endDate||''};reg={enabled:!project.id||P.isWeighted(project),steps:clone(project.steps||[]),phase:'define'};if(reg.enabled&&!reg.steps.length)reg.steps=[freshStep()];},
  enabled:()=>reg.enabled,
@@ -49,5 +50,5 @@ window.StepUI={
  overallSnapshot:()=>clone(overallReports),restoreOverall(value){overallReports=clone(value||{});renderReports();},
  reportSnapshot:()=>clone(reports),restoreReports(value){reports=clone(value||{});renderReports();},
  reportCandidate(project){return P.withStepTotals(project,reports);},
- detail(host,project){mount(host,<StepDetail project={project}/>);}
+ detail(host,project){mount(host,<StepDetail key={project.id} project={project}/>);}
 };
