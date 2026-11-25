@@ -16,7 +16,7 @@ test('P25 legacy single-plan monthly flow restores drafts, preserves annual edit
     // Reopening mimics a recovered page: working copy is restored without changing stored records.
     await user.click(body.getByRole('button',{name:'전체 과제 보기'}));await user.click(body.getByRole('button',{name:'실적 입력',exact:true}));await user.selectOptions(body.getByLabelText('과제',{exact:true}),'monthly-old');
     assert.equal(body.getByLabelText('전체 과제 2025-01 실적 (%)').value,'40');assert.equal(body.getByLabelText('전체 과제 2025-01 Catch Up Plan').value,'추가 검증');
-    assert.equal(JSON.parse(dom.window.localStorage.getItem('at-project-demo-v1'))[0].monthly['2025-01'].actual,undefined);
+    assert.equal(JSON.parse(dom.window.localStorage.getItem('at-project-demo-v1')).find(p=>p.id==='monthly-old').monthly['2025-01'].actual,undefined);
     dom.window.location.hash='#report=monthly-old&month=2025-02';
     await waitFor(()=>assert.equal(body.getByLabelText('입력할 보고 월').value,'2025-02'),{container:dom.window.document.body});
     assert.ok(body.getByLabelText('전체 과제 2025-02 실적 (%)'));
