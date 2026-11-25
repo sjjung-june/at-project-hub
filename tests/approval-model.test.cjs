@@ -7,7 +7,7 @@ const model = require('../dist/approval-model.js');
 
 const author = { id: 'writer', name: '홍 작성', role: 'participant', team: '공정팀' };
 const leader = { id: 'lead', name: '김 팀장', role: 'team-lead', team: '공정팀' };
-const head = { id: 'head', name: '이 담당장', role: 'at-head', team: 'AT' };
+const head = { id: 'head', name: '이 담당', role: 'at-head', team: 'AT' };
 const at = '2026-06-01T00:00:00.000Z';
 const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -115,7 +115,7 @@ test('team, PO and exact date changes each require the AT head', () => {
     candidate[field] = { team: '새 팀', po: '새 PO', startDate: '2026-03-11', endDate: '2026-05-21' }[field];
     assert.equal(model.requiredRole(input, candidate), 'at-head');
     const pending = request(input, candidate);
-    assert.throws(() => decide(pending), /AT 담당장/);
+    assert.throws(() => decide(pending), /AT 담당/);
     assert.equal(decide(pending, 'approved', head)[field], candidate[field]);
   }
 });

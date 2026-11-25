@@ -13,7 +13,7 @@ export function createApiClient({baseUrl='/api',fetchImpl=fetch,getAccessToken}=
   }
   const path=id=>`/projects/${encodeURIComponent(id)}`;
   return {
-    me:()=>request('/me'),list:({limit=100,offset=0}={})=>request(`/projects?limit=${limit}&offset=${offset}`),get:id=>request(path(id)),
+    me:()=>request('/me'),myProjects:()=>request('/me/projects'),list:({limit=100,offset=0}={})=>request(`/projects?limit=${limit}&offset=${offset}`),get:id=>request(path(id)),
     create:project=>request('/projects',{method:'POST',body:project}),
     saveReports:(project,body)=>request(path(project.id)+'/reports',{method:'PUT',revision:project._revision,body}),
     requestChange:(project,candidate,reason)=>request(path(project.id)+'/change-requests',{method:'POST',revision:project._revision,body:{candidate,reason}}),

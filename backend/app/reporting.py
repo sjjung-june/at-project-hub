@@ -22,7 +22,7 @@ def assert_reviewer(project, actor, submitter):
     if approvals.same_person(actor.model_dump(), submitter):
         raise DomainError('본인이 제출한 실적은 직접 확정할 수 없습니다.', 403)
     if not (actor.role == 'at-head' or actor.role == 'team-lead' and actor.team == project['team']):
-        raise DomainError('소속 팀장 또는 담당장만 실적을 검토할 수 있습니다.', 403)
+        raise DomainError('소속 팀장 또는 담당만 실적을 검토할 수 있습니다.', 403)
 
 
 class ReportingService:

@@ -57,6 +57,11 @@ class ProjectService:
         with self.pool.connection() as conn:
             return [row["document"] for row in conn.execute("SELECT document FROM projects ORDER BY updated_at DESC,id LIMIT %s OFFSET %s", [limit, offset])]
 
+    def list_mine(self, actor):
+        # Account IDs are assigned by the trusted organization integration, never display-name matches.
+        with self.pool.connection() as conn:
+            return [row['document'] for row in conn.execute("SELECT document FROM projects WHERE document->>'_ownerId'=%s OR COALESCE(document->'_memberIds','[]'::jsonb) ? %s OR document->>'_poId'=%s OR document->>'_pmId'=%s ORDER BY updated_at DESC,id", [actor.id,actor.id,actor.id,actor.id])]
+
     def get(self, project_id):
         with self.pool.connection() as conn:
             row = conn.execute("SELECT document FROM projects WHERE id=%s", [project_id]).fetchone()

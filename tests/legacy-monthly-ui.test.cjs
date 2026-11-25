@@ -31,7 +31,7 @@ test('P26 project detail exposes each Step monthly plan and the automatic sum ac
   await new Promise(resolve=>dom.window.addEventListener('load',resolve,{once:true}));
   const {within}=require('@testing-library/dom'),user=require('@testing-library/user-event').default.setup({document:dom.window.document}),body=within(dom.window.document.body);
   try{
-    await user.click(body.getByText(exact.title,{exact:true}));
+    await user.click(body.getByRole('button',{name:'담당 전체 과제 보기',exact:true}));await user.click(body.getByText(exact.title,{exact:true}));
     const region=within(body.getByRole('region',{name:'2026년 Step별 월간 계획'}));
     const values=name=>within(region.getByRole('row',{name})).getAllByRole('cell').map(c=>c.textContent);
     assert.deepEqual(values(/Step 1/).slice(9),['0%','10%','20%']);assert.deepEqual(values(/Step 2/).slice(9),['0%','20%','70%']);
@@ -40,5 +40,20 @@ test('P26 project detail exposes each Step monthly plan and the automatic sum ac
     const next=within(body.getByRole('region',{name:'2027년 Step별 월간 계획'}));
     assert.equal(within(next.getByRole('row',{name:/전체 목표/})).getAllByRole('cell')[0].textContent,'100%');
     assert.deepEqual(errors,[]);
+  }finally{dom.window.close();}
+});
+
+test('P30 demo starts at personal home; collaborators see their roles and general members reach the full list',async()=>{
+  const dom=new JSDOM(html,{url:'http://localhost/',runScripts:'dangerously',pretendToBeVisual:true,beforeParse(w){w.scrollTo=()=>{};w.localStorage.setItem('at-project-demo-v1',JSON.stringify([p]));w.HTMLElement.prototype.scrollIntoView=()=>{};}});
+  await new Promise(resolve=>dom.window.addEventListener('load',resolve,{once:true}));
+  const {within}=require('@testing-library/dom'),user=require('@testing-library/user-event').default.setup({document:dom.window.document}),body=within(dom.window.document.body);
+  try{
+    assert.ok(body.getByRole('heading',{name:'내 대시보드',exact:true}));
+    await user.selectOptions(body.getByLabelText('체험할 사용자'),'demo:collaborator');
+    assert.equal(body.getAllByText(/내 역할: 공동 수행자/).length,9);
+    await user.selectOptions(body.getByLabelText('체험할 사용자'),'demo:member');
+    assert.ok(body.getByText('연결된 담당·참여 과제가 없습니다. 담당 전체 과제는 계속 조회할 수 있습니다.'));
+    await user.click(body.getByRole('button',{name:'담당 전체 과제 보기',exact:true}));
+    assert.ok(body.getByRole('heading',{name:'전체 과제 현황'}));assert.ok(body.getByText(p.title,{exact:true}));
   }finally{dom.window.close();}
 });

@@ -7,7 +7,7 @@ const {PilotApp}=require('../work/pilot-ui-test.cjs');const Plan=require('../dis
 const seed=()=>Plan.withStepTotals({id:'p1',title:'파일럿 과제',team:'AT팀',po:'대표',pm:'PM',tech:['All Tech'],startDate:'2025-01-01',endDate:'2025-02-28',planMode:'cumulative-percent-v1',stepPlanMode:'weighted-steps-v1',_revision:1,_ownerId:'owner',steps:[{id:'a',name:'분석',weight:40,startDate:'2025-01-01',endDate:'2025-02-28',monthly:{'2025-01':{goal:50},'2025-02':{goal:100}}},{id:'b',name:'검증',weight:60,startDate:'2025-01-01',endDate:'2025-02-28',monthly:{'2025-01':{goal:50},'2025-02':{goal:100}}}],stepReports:{}});
 function fakeApi(extra={}){let stored=seed();return{me:async()=>({id:'owner',name:'과제 대표',team:'AT팀',role:'project-representative'}),list:async()=>({projects:[stored]}),get:async()=>stored,statistics:async()=>({counts:{eligible:1,reported:0,approved:0,late:0,missing:1,ended:0,paused:0},notice:'같은 기준 월'}),attachments:async()=>({attachments:[]}),submissions:async()=>({submissions:[]}),history:async()=>({events:[]}),create:async input=>stored={...Plan.withStepTotals(input),id:'new',_revision:1},saveReports:async(p,body)=>stored={...Plan.withStepTotals(p,body.stepReports),_revision:p._revision+1},...extra};}
 async function open(api){render(React.createElement(PilotApp,{api,Plan}));await screen.findByText('과제 대표 · AT팀');await waitFor(()=>assert.equal(screen.getByRole('button',{name:'새 과제 등록'}).disabled,false));return userEvent.setup();}
-async function choose(user){await user.click(screen.getByRole('button',{name:/파일럿 과제/}));await screen.findByRole('button',{name:'실적 초안 저장'});await user.click(screen.getByRole('button',{name:'연간 표 펼치기'}));}
+async function choose(user){await user.click(screen.getByRole('button',{name:'담당 전체 과제',exact:true}));await user.click(screen.getByRole('button',{name:/파일럿 과제/}));await screen.findByRole('button',{name:'실적 초안 저장'});await user.click(screen.getByRole('button',{name:'연간 표 펼치기'}));}
 test.afterEach(()=>{cleanup();window.sessionStorage.clear();});
 test('P11 registration defines Steps before plans and prevents double submission',async()=>{let calls=0,release;const api=fakeApi({create:input=>{calls++;return new Promise(resolve=>{release=()=>resolve({...Plan.withStepTotals(input),id:'new',_revision:1});});}});const user=await open(api);await user.click(screen.getByRole('button',{name:'새 과제 등록'}));await user.type(screen.getByLabelText('과제 제목'),'첫 과제');await user.type(screen.getByLabelText('소속 팀'),'AT팀');await user.clear(screen.getByLabelText('과제 시작일'));await user.type(screen.getByLabelText('과제 시작일'),'2025-01-01');await user.clear(screen.getByLabelText('과제 종료일'));await user.type(screen.getByLabelText('과제 종료일'),'2025-02-28');await user.click(screen.getByLabelText('All Tech'));assert.equal(screen.queryByLabelText('Step 1 2025-01 목표 (%)'),null);await user.click(screen.getByRole('button',{name:'Step 정의하기'}));await user.click(screen.getByRole('button',{name:'월별 계획 입력'}));await user.type(screen.getByLabelText('Step 1 2025-01 목표 (%)'),'50');await user.type(screen.getByLabelText('Step 1 2025-02 목표 (%)'),'100');await user.click(screen.getByRole('button',{name:'과제 등록',exact:true}));assert.equal(calls,1);assert.equal(screen.getByRole('button',{name:'저장 중…'}).disabled,true);release();await screen.findByText('과제를 공용 서버에 등록했습니다.');});
 test('P12 contribution cap blocks invalid actual; conflict preserves input across tabs',async()=>{let calls=0;const api=fakeApi({saveReports:async()=>{calls++;const e=new Error('다른 사용자가 수정했습니다.');e.status=409;throw e;}});const user=await open(api);await choose(user);await user.type(screen.getByLabelText('분석 2025-01 실적 (%)'),'41');await user.click(screen.getByRole('button',{name:'실적 초안 저장'}));assert.equal(calls,0);await screen.findByText('분석 실적은 0~40%여야 합니다.');await user.clear(screen.getByLabelText('분석 2025-01 실적 (%)'));await user.type(screen.getByLabelText('분석 2025-01 실적 (%)'),'20');await user.click(screen.getByRole('button',{name:'실적 초안 저장'}));await screen.findByText(/입력 내용은 유지했습니다/);assert.equal(calls,1);assert.equal(screen.getByLabelText('분석 2025-01 실적 (%)').value,'20');await user.click(screen.getByRole('button',{name:'첨부 증빙'}));await user.click(screen.getByRole('button',{name:'월별 실적'}));assert.equal(screen.getByLabelText('분석 2025-01 실적 (%)').value,'20');});
@@ -23,11 +23,11 @@ test('P18 expired login hides project data and restores own draft after reauthen
 
 test('P19 existing aggregate-only projects can report without Step migration',async()=>{const p=seed();delete p.stepPlanMode;delete p.steps;delete p.stepReports;p.monthly={'2025-01':{goal:50,actual:40,reason:'기존 지연',catchup:'기존 만회'},'2025-02':{goal:100}};let saved;const api=fakeApi({get:async()=>p,saveReports:async(project,body)=>{saved=body;return{...p,monthly:{...p.monthly,'2025-01':{...p.monthly['2025-01'],...body.monthly['2025-01']}},_revision:2};}});const user=await open(api);await choose(user);await user.clear(screen.getByLabelText('전체 과제 2025-01 실적 (%)'));await user.type(screen.getByLabelText('전체 과제 2025-01 실적 (%)'),'45');await user.click(screen.getByRole('button',{name:'실적 초안 저장'}));await waitFor(()=>assert.ok(saved));assert.equal(saved.monthly['2025-01'].actual,45);assert.equal(saved.monthly['2025-01'].catchup,'기존 만회');await user.click(screen.getByRole('button',{name:'첨부 증빙'}));await screen.findByRole('button',{name:'첨부 등록'});});
 
-test('P20 changing statistics month ignores an older response arriving last',async()=>{const pending={};const base=fakeApi();const api={...base,statistics:month=>month.startsWith('2025-')?new Promise(resolve=>{pending[month]=resolve;}):base.statistics(month)};const user=await open(api);const input=screen.getByLabelText('통계 기준 월');await user.clear(input);await user.type(input,'2025-01');await waitFor(()=>assert.ok(pending['2025-01']));await user.clear(input);await user.type(input,'2025-02');await waitFor(()=>assert.ok(pending['2025-02']));const result=n=>({counts:{eligible:n,reported:0,approved:0,late:0,missing:0,ended:0,paused:0},notice:'같은 기준 월'});await act(async()=>pending['2025-02'](result(2)));await screen.findByText('2건');await act(async()=>pending['2025-01'](result(99)));assert.equal(screen.queryByText('99건'),null);assert.equal(input.value,'2025-02');});
+test('P20 changing statistics month ignores an older response arriving last',async()=>{const pending={};const base=fakeApi();const api={...base,statistics:month=>month.startsWith('2025-')?new Promise(resolve=>{pending[month]=resolve;}):base.statistics(month)};const user=await open(api);await user.click(screen.getByRole('button',{name:'담당 전체 과제',exact:true}));const input=screen.getByLabelText('통계 기준 월');await user.clear(input);await user.type(input,'2025-01');await waitFor(()=>assert.ok(pending['2025-01']));await user.clear(input);await user.type(input,'2025-02');await waitFor(()=>assert.ok(pending['2025-02']));const result=n=>({counts:{eligible:n,reported:0,approved:0,late:0,missing:0,ended:0,paused:0},notice:'같은 기준 월'});await act(async()=>pending['2025-02'](result(2)));await screen.findByText('2건');await act(async()=>pending['2025-01'](result(99)));assert.equal(screen.queryByText('99건'),null);assert.equal(input.value,'2025-02');});
 
 test('P21 monthly focus selects missed month, hides other inputs and connects evidence and submission',async()=>{
   const user=await open(fakeApi());
-  await user.click(screen.getByRole('button',{name:/파일럿 과제/}));
+  await user.click(screen.getByRole('button',{name:'담당 전체 과제',exact:true}));await user.click(screen.getByRole('button',{name:/파일럿 과제/}));
   await screen.findByLabelText('입력할 보고 월');
   assert.equal(screen.getByLabelText('입력할 보고 월').value,'2025-01');
   assert.ok(screen.getByLabelText('분석 2025-01 실적 (%)'));
@@ -43,7 +43,7 @@ test('P21 monthly focus selects missed month, hides other inputs and connects ev
 
 test('P22 completed Step carries forward without repeated input; conditional delay fields follow selected month',async()=>{
   const p=seed();p.stepReports={a:{'2025-01':{actual:100}},b:{'2025-01':{actual:50}}};
-  const user=await open(fakeApi({get:async()=>p}));await user.click(screen.getByRole('button',{name:/파일럿 과제/}));
+  const user=await open(fakeApi({get:async()=>p}));await user.click(screen.getByRole('button',{name:'담당 전체 과제',exact:true}));await user.click(screen.getByRole('button',{name:/파일럿 과제/}));
   await screen.findByLabelText('입력할 보고 월');assert.equal(screen.getByLabelText('입력할 보고 월').value,'2025-02');
   assert.equal(screen.queryByLabelText('분석 2025-02 실적 (%)'),null);
   await screen.findByText('이전 월에 완료한 Step입니다. 40%를 자동 반영했습니다.');
@@ -61,4 +61,17 @@ test('P23 registration only exposes current stage and keeps input when navigatin
   await user.click(screen.getByRole('button',{name:'Step 정의하기'}));
   assert.equal(screen.queryByLabelText('과제 제목'),null);assert.ok(screen.getByLabelText('Step 1 이름'));
   await user.click(screen.getByRole('button',{name:'기본 정보 수정'}));assert.equal(screen.getByLabelText('과제 제목').value,'단계별 등록');
+});
+
+test('P27 personal home shows participation role and opens the exact missed month',async()=>{
+ const p=seed();delete p._ownerId;p._memberIds=['owner'];p.stepReports={a:{'2025-02':{actual:100}},b:{'2025-02':{actual:100}}};
+ const api=fakeApi({list:async()=>({projects:[p]}),get:async()=>p});const user=await open(api);
+ await screen.findByRole('heading',{name:'과제 대표님의 대시보드'});await screen.findByText('AT팀 · 내 역할: 참여자');
+ await user.click(screen.getByRole('button',{name:/지난 월 누락 · 파일럿 과제/}));
+ assert.equal(screen.getByLabelText('입력할 보고 월').value,'2025-01');assert.equal(screen.getByLabelText('분석 2025-01 실적 (%)').disabled,false);
+});
+
+test('P28 general member can browse all projects despite no personal participation and stays read-only',async()=>{
+ const api=fakeApi({me:async()=>({id:'visitor',name:'일반 구성원',role:'member',team:'다른 팀'})});render(React.createElement(PilotApp,{api,Plan}));
+ await screen.findByText('다른 팀 · 내 역할: 참여자').catch(()=>{});
 });

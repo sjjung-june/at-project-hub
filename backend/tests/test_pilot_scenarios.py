@@ -229,3 +229,28 @@ def test_P24_HTTP_monthly_clock_missed_report_backfill_and_human_errors(pilot,mo
     rejected({'2027-12':{'actual':30}},409)
     frozen=client.get(f"/api/projects/{p['id']}/submissions?month=2028-01").json()['submissions'][0]['snapshot']
     assert frozen['monthly']['actual']==50
+
+
+def test_P29_personal_participation_is_id_based_and_all_members_can_read_all_projects(pilot):
+    from psycopg.types.json import Jsonb
+    client,app,root=pilot;p=create(client);pid=p['id']
+    # Simulate the trusted organization adapter's stored account assignment, not client metadata.
+    with app.state.pool.connection() as conn:
+        conn.execute("UPDATE projects SET document=jsonb_set(document,'{_memberIds}',%s) WHERE id=%s",[Jsonb(['collaborator']),pid])
+    app.state.person=Actor(id='collaborator',name='공동 수행자',role='participant',team='다른 팀')
+    mine=client.get('/api/me/projects');assert mine.status_code==200,mine.text
+    assert [project['id'] for project in mine.json()['projects']]==[pid]
+    assert mine.json()['total']==1
+    # Same display name as the PO/owner cannot gain personal membership or edit authority.
+    app.state.person=Actor(id='reader',name='과제 대표',role='member',team='다른 팀')
+    assert client.get('/api/me/projects').json()=={'projects':[],'total':0}
+    assert any(project['id']==pid for project in client.get('/api/projects').json()['projects'])
+    assert client.get(f'/api/projects/{pid}').status_code==200
+    assert client.get(f'/api/projects/{pid}/history').status_code==200
+    assert client.get(f'/api/projects/{pid}/submissions').status_code==200
+    assert client.get(f'/api/projects/{pid}/attachments').status_code==200
+    response=client.put(f'/api/projects/{pid}/reports',headers={'If-Match':f'"{p["_revision"]}"'},json={'stepReports':{'a':{'2024-12':{'actual':100}}}})
+    assert response.status_code==403
+    # Ownership stays linked to the login ID, even if the person's display name changes.
+    app.state.person=Actor(id='owner',name='변경된 이름',role='project-representative',team='AT팀')
+    assert client.get('/api/me/projects').json()['projects'][0]['id']==pid

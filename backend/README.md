@@ -108,7 +108,7 @@ OIDC_JWKS_URL=https://your-corporate-issuer/jwks
 
 Authorization Bearer JWT의 RS256 서명·issuer·audience·만료·필수 클레임을 검증합니다. 검증된 `sub`는 사용자 ID, `name`은 표시명, 사내 인증 서버가 부여한 `at_role`/`at_team`은 역할/팀으로 사용합니다. 허용 역할은 at-head, team-lead, system-admin, project-representative, participant, member입니다. 본문이나 임의 역할 헤더를 신뢰하지 않습니다. issuer/audience/JWKS 미설정이면 인증을 차단합니다.
 
-편집은 생성자·서버 등록 참여자·소속 팀장·담당장·관리자에 허용합니다. 승인 처리는 팀장/담당장과 자기 승인 제한을 별도로 적용합니다. 목록·상세·이력은 조직의 인증 사용자에게 공개합니다. 조직별 조회 범위 정책, 조직도 사용자/참여자 ID 지정, SSO 리다이렉트 로그인·세션 발급은 실제 사내 환경에 맞춰 연결해야 합니다. 이 API는 세션을 발급하지 않고 검증된 액세스 토큰을 받습니다.
+편집은 생성자·서버 등록 참여자·소속 팀장·담당·관리자에 허용합니다. 승인 처리는 팀장/담당과 자기 승인 제한을 별도로 적용합니다. 목록·상세·이력은 조직의 인증 사용자에게 공개합니다. 조직별 조회 범위 정책, 조직도 사용자/참여자 ID 지정, SSO 리다이렉트 로그인·세션 발급은 실제 사내 환경에 맞춰 연결해야 합니다. 이 API는 세션을 발급하지 않고 검증된 액세스 토큰을 받습니다.
 
 ## 프런트엔드 연결
 
@@ -142,7 +142,7 @@ DB 테스트는 별도 스키마를 생성·제거합니다. GitHub Actions는 P
 - `POST /api/projects/{id}/attachments`, `GET .../attachments`, `GET .../attachments/{file_id}/download`: 과제·Step·보고 월 증빙 및 새 버전. 업로드는 multipart `file`, 선택 `step_id`/`month`/`replaces_id`, `If-Match`를 사용합니다.
 - `POST /api/projects/{id}/months/{month}/submit`: 해당 월 실적 제출과 계획·실적·증빙 스냅샷. 완료 증빙 필수 Step은 파일을 확인합니다.
 - `GET /api/projects/{id}/submissions`: 제출/보완/확정 내역.
-- `POST /api/projects/{id}/submissions/{sid}/review`: `{decision: "approved" | "returned", comment: 검토의견}`. 같은 팀장/담당장 검토, 자기 확정 금지.
+- `POST /api/projects/{id}/submissions/{sid}/review`: `{decision: "approved" | "returned", comment: 검토의견}`. 같은 팀장/담당 검토, 자기 확정 금지.
 
 `002_pilot_reporting.sql`, `003_submission_retention.sql`을 추가했습니다. 기존 DB에도 `python -m app.db`를 다시 실행해야 합니다. 파일 저장 위치는 `ATTACHMENT_DIR`, 기본 한도는 `ATTACHMENT_MAX_BYTES`입니다. Docker 이미지는 `/data/attachments`를 사용하며 영속 볼륨을 연결해야 합니다. 현재 구현은 파일 볼륨 저장소이며 HCP 오브젝트 스토리지·악성코드 검사 연결은 후속 작업입니다.
 

@@ -187,7 +187,7 @@
       const permitted = actor.role === 'at-head' || (role === 'team-lead'
         && actor.role === 'team-lead' && text(actor.team) === text(request.base.team));
       if (!permitted) throw new Error(role === 'at-head'
-        ? '일정, 소속 팀 또는 PO 변경은 AT 담당장이 검토해야 합니다.' : '해당 팀의 팀장 또는 AT 담당장만 검토할 수 있습니다.');
+        ? '일정, 소속 팀 또는 PO 변경은 AT 담당이 검토해야 합니다.' : '해당 팀의 팀장 또는 AT 담당만 검토할 수 있습니다.');
       if (decision === 'rejected' && !comment) throw new Error('반려 사유를 입력해 주세요.');
     }
     if (!comment) throw new Error(decision === 'withdrawn' ? '철회 사유를 입력해 주세요.' : '승인 검토 의견을 입력해 주세요.');

@@ -29,6 +29,12 @@ FilesDep=Annotated[AttachmentService,Depends(attachments)]
 def me(actor:ActorDep):return actor
 
 
+@router.get('/me/projects')
+def my_projects(actor:ActorDep,service:ServiceDep):
+    projects=service.list_mine(actor)
+    return {'projects':projects,'total':len(projects)}
+
+
 @router.get('/statistics')
 def statistics(month:str,actor:ActorDep,service:ReportsDep,team:str|None=None):return service.statistics(month,team)
 

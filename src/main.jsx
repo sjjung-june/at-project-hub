@@ -1,5 +1,6 @@
 import React,{useState} from 'react';
 import {StepPlanMatrix} from './StepPlanMatrix';
+import {PersonalHome} from './PersonalHome';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import {MonthReport} from './pilot/App';
@@ -36,6 +37,7 @@ function AggregateAnnualReport({project}){const active=P.periodMonths(project.st
 function renderReports(){if(reportProject){const toolbar=document.querySelector('#performanceContent .annual-toolbar');if(toolbar)toolbar.hidden=reportFocus;mount(document.getElementById('reportGrid'),<Report/>);}}
 function StepDetail({project}){const years=P.years(project.startDate,project.endDate),current=Number(P.today().slice(0,4));const [selectedYear,setSelectedYear]=useState(years.includes(current)?current:years[0]);return <Card><Row><h3>Step별 월간 계획</h3><Label>계획 조회 연도<select value={selectedYear} onChange={e=>setSelectedYear(Number(e.target.value))}>{years.map(y=><option key={y} value={y}>{y}년</option>)}</select></Label></Row><StepPlanMatrix project={project} Plan={P} year={selectedYear}/>{project.steps.map(step=><Note key={step.id}>{step.name} · 비중 {step.weight}% · {step.startDate} ~ {step.endDate}</Note>)}</Card>;}
 window.StepUI={
+ home(host,props){mount(host,<PersonalHome {...props} Plan={P}/>);},
  init(project){dates={startDate:project.startDate||'',endDate:project.endDate||''};reg={enabled:!project.id||P.isWeighted(project),steps:clone(project.steps||[]),phase:'define'};if(reg.enabled&&!reg.steps.length)reg.steps=[freshStep()];},
  enabled:()=>reg.enabled,
  update(nextDates,nextYear){dates=nextDates;year=nextYear;for(const step of reg.steps){if(!step.startDate)step.startDate=dates.startDate;if(!step.endDate)step.endDate=dates.endDate;}renderEditor();},
