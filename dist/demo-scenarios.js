@@ -3,7 +3,7 @@
   const clone=x=>JSON.parse(JSON.stringify(x));
   const shift=(month,n)=>{const [y,m]=month.split('-').map(Number),i=y*12+m-1+n;return `${Math.floor(i/12)}-${String(i%12+1).padStart(2,'0')}`;};
   const last=month=>{const [y,m]=month.split('-').map(Number);return `${month}-${new Date(Date.UTC(y,m,0)).getUTCDate()}`;};
-  const round=n=>Math.round(n*10000)/10000;
+  const round=n=>Math.round(n);
   function buildExamples(asOf=P.monthNow()){
     const year=Number(asOf.slice(0,4));
     const specs=[
