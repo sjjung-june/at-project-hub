@@ -1,5 +1,5 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, Response
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, Response, Query
 from fastapi.responses import FileResponse
 from .projects import ActorDep, ServiceDep, RevisionDep, etag
 from ..attachments import AttachmentService
@@ -70,3 +70,8 @@ def upload(pid:str,actor:ActorDep,service:FilesDep,revision:RevisionDep,file:Ann
 def download(pid:str,aid:str,actor:ActorDep,service:FilesDep):
     path,name=service.download(pid,aid)
     return FileResponse(path,filename=name,media_type='application/octet-stream',headers={'X-Content-Type-Options':'nosniff','Cache-Control':'private, no-store'})
+
+
+@router.get('/knowledge')
+def knowledge_index(actor: ActorDep, service: ServiceDep, limit: int = Query(200, ge=1, le=500), offset: int = Query(0, ge=0)):
+    return service.knowledge_index(limit, offset)

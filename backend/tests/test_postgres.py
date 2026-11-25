@@ -99,3 +99,36 @@ def test_postgres_http_contract(pool, project, actor):
         assert len(history) == 1
         assert history[0]["after_document"]["id"] == pid
         assert client.get("/api/projects/unknown").status_code == 404
+
+
+def test_knowledge_persistence_authorization_conflict_and_history(pool, actor, project):
+    from app.schemas import KnowledgeUpdate
+    service = ProjectService(pool)
+    first = service.create(ProjectPlan.model_validate(project), actor)
+    second = service.create(ProjectPlan.model_validate({**project,'title':'후속 과제'}), actor)
+    stranger = Actor(id='stranger',name='구성원',role='member',team='AT팀')
+    body = KnowledgeUpdate(problem='공정 변동',approach='단계 검증',result='검증 절차 확보',lessons='데이터 품질 선확인',conditions='동일 환경에서 재검증',status='published',relations=[{'projectId':second['id'],'type':'successor'}],artifacts=[{'title':'검증 가이드','url':'https://docs.example.test/guide'}])
+    with pytest.raises(DomainError) as denied:
+        service.save_knowledge(first['id'],1,body,stranger)
+    assert denied.value.status == 403
+    saved = service.save_knowledge(first['id'],1,body,actor)
+    assert saved['_revision'] == 2
+    assert saved['_knowledge']['updatedBy']['id'] == actor.id
+    assert ProjectService(pool).get(first['id'])['_knowledge']['result'] == '검증 절차 확보'
+    assert service.knowledge_index()['total'] == 2
+    assert all('stepReports' not in p for p in service.knowledge_index()['projects'])
+    event = service.history(first['id'])[0]
+    assert event['action'] == 'knowledge_saved'
+    assert event['details']['knowledgeChanges']['before'] is None
+    with pytest.raises(DomainError) as stale:
+        service.save_knowledge(first['id'],1,body,actor)
+    assert stale.value.status == 409
+    for invalid in ({'relations':[{'projectId':first['id'],'type':'related'}]}, {'relations':[{'projectId':'missing','type':'related'}]}, {'status':'published'}):
+        with pytest.raises(DomainError):
+            service.save_knowledge(first['id'],2,KnowledgeUpdate.model_validate(invalid),actor)
+    assert service.get(first['id'])['_revision'] == 2
+    candidate = {**saved,'title':'변경된 제목'}
+    pending = service.request_change(first['id'],2,ChangeRequest(candidate=ProjectPlan.model_validate(candidate),reason='명칭 정리'),actor)
+    lead = Actor(id='lead',name='팀장',role='team-lead',team=actor.team)
+    approved = service.decide(first['id'],3,pending['_changeRequests'][-1]['id'],Decision(decision='approved',comment='확인'),lead)
+    assert approved['_knowledge'] == saved['_knowledge']

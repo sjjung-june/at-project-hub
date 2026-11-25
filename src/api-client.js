@@ -18,6 +18,8 @@ export function createApiClient({baseUrl='/api',fetchImpl=fetch,getAccessToken}=
     saveReports:(project,body)=>request(path(project.id)+'/reports',{method:'PUT',revision:project._revision,body}),
     requestChange:(project,candidate,reason)=>request(path(project.id)+'/change-requests',{method:'POST',revision:project._revision,body:{candidate,reason}}),
     decide:(project,requestId,decision,comment)=>request(path(project.id)+`/change-requests/${encodeURIComponent(requestId)}/decisions`,{method:'POST',revision:project._revision,body:{decision,comment}}),
+    knowledge:({limit=200,offset=0}={})=>request(`/knowledge?limit=${limit}&offset=${offset}`),
+    saveKnowledge:(project,body)=>request(path(project.id)+'/knowledge',{method:'PUT',revision:project._revision,body}),
     history:id=>request(path(id)+'/history'),
     attachments:id=>request(path(id)+'/attachments'),
     upload:(project,file,{stepId,month,replacesId}={})=>{const form=new FormData();form.append('file',file);if(stepId)form.append('step_id',stepId);if(month)form.append('month',month);if(replacesId)form.append('replaces_id',replacesId);return request(path(project.id)+'/attachments',{method:'POST',revision:project._revision,form});},

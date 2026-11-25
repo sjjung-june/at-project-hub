@@ -73,3 +73,28 @@ def test_upload_body_limit_stops_oversized_request_before_spooling():
     with TestClient(app) as client:
         response=client.post('/api/projects/id/attachments',content=b'x',headers={'Content-Type':'multipart/form-data; boundary=x','Content-Length':str(2*1024*1024)})
         assert response.status_code==413
+
+
+def test_knowledge_api_auth_revision_and_safe_link_validation(actor):
+    class Service:
+        def knowledge_index(self, limit, offset):
+            return {'projects': [], 'total': 0, 'limit': limit, 'offset': offset}
+        def save_knowledge(self, pid, revision, body, who):
+            assert revision == 3
+            assert who.id == actor.id
+            return {'id': pid, '_revision': 4, '_knowledge': body.model_dump()}
+    app = create_app(Settings(_env_file=None, app_env='test'))
+    app.dependency_overrides[get_service] = Service
+    with TestClient(app) as client:
+        assert client.get('/api/knowledge').status_code == 401
+        app.dependency_overrides[get_actor] = lambda: actor
+        assert client.get('/api/knowledge?offset=200').json()['offset'] == 200
+        assert client.get('/api/knowledge?limit=501').status_code == 422
+        path = '/api/projects/p/knowledge'
+        assert client.put(path, json={}).status_code == 409
+        result = client.put(path, headers={'If-Match':'"3"'}, json={'problem':'정리 중'})
+        assert result.headers['etag'] == '"4"'
+        assert result.json()['_knowledge']['problem'] == '정리 중'
+        for url in ('javascript:alert(1)', 'https://user:secret@example.test/doc'):
+            assert client.put(path, headers={'If-Match':'"3"'}, json={'artifacts':[{'title':'문서','url':url}]}).status_code == 422
+        assert client.put(path, headers={'If-Match':'"3"'}, json={'updatedBy':{'id':'forged'}}).status_code == 422

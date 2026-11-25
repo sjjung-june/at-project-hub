@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from ..auth import get_actor
 from ..errors import DomainError
-from ..schemas import Actor, ChangeRequest, Decision, ProjectList, ProjectPlan, ReportUpdate
+from ..schemas import Actor, ChangeRequest, Decision, KnowledgeUpdate, ProjectList, ProjectPlan, ReportUpdate
 from ..services import ProjectService
 
 router = APIRouter(prefix="/api/projects", tags=["Projects"])
@@ -66,3 +66,8 @@ def decide(project_id: str, request_id: str, body: Decision, response: Response,
 @router.get("/{project_id}/history")
 def history(project_id: str, actor: ActorDep, service: ServiceDep, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), snapshots: bool = False):
     return {"events": service.history(project_id, limit, offset, snapshots), "limit": limit, "offset": offset}
+
+
+@router.put('/{project_id}/knowledge')
+def save_knowledge(project_id: str, body: KnowledgeUpdate, response: Response, actor: ActorDep, service: ServiceDep, revision: RevisionDep):
+    return etag(response, service.save_knowledge(project_id, revision, body, actor))

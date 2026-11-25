@@ -35,6 +35,7 @@
           if (planChanges.length && JSON.stringify(ApprovalModel.snapshot(record)) !== JSON.stringify(newlyApproved.candidate)) throw new Error('승인된 변경안과 저장 내용이 일치하지 않습니다.');
           record._audit = [...new Map([...auditEvents(previous), ...(record._audit || [])].map(item => [item.id, clone(item)])).values()];
           record._baseline = clone(previous._baseline || record._baseline || ApprovalModel.snapshot(previous));
+          if (JSON.stringify(previous._knowledge||null)!==JSON.stringify(record._knowledge||null)) record._audit.push(event('경험 카드·과제 관계 저장',{before:clone(previous._knowledge||null),after:clone(record._knowledge||null),changes:[{label:'경험 카드 상태',before:previous._knowledge?.status||'미등록',after:record._knowledge?.status||'미등록'}]}));
           const reportChanges = OperationsModel.changes(previous, record).filter(change => /\.actual$|\.reason$|\.catchup$/.test(change.field));
           // Moving preserved reports into/out of the archive is covered by the approval event.
           if (reportChanges.length && !newlyApproved) record._audit.push(event('실적 변경', { changes: reportChanges, before: clone(PlanModel.isWeighted(previous)?{monthly:previous.monthly,stepReports:previous.stepReports}:previous.monthly || {}), after: clone(PlanModel.isWeighted(record)?{monthly:record.monthly,stepReports:record.stepReports}:record.monthly || {}) }));

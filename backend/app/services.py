@@ -43,6 +43,7 @@ def audit_details(before, after, action):
                     previous,current=old.get(month,{}).get(field),new.get(month,{}).get(field)
                     if previous!=current:reports.append({'field':'.'.join(filter(None,[kind,step_id,month,field])),'before':previous,'after':current})
     if reports:details['reportChanges']=reports
+    if action=='knowledge_saved':details['knowledgeChanges']={'before':before.get('_knowledge'),'after':after.get('_knowledge')}
     if action=='attachment_uploaded':details['attachment']=after.get('_lastAttachment')
     if before.get('_reporting',{})!=after.get('_reporting',{}):
         details['reportingChanges']={month:{'before':before.get('_reporting',{}).get(month),'after':state} for month,state in after.get('_reporting',{}).items() if before.get('_reporting',{}).get(month)!=state}
@@ -162,3 +163,38 @@ class ProjectService:
         columns = "id,action,actor,details,created_at" + (",before_document,after_document" if snapshots else "")
         with self.pool.connection() as conn:
             return conn.execute(f"SELECT {columns} FROM audit_events WHERE project_id=%s ORDER BY created_at DESC,id LIMIT %s OFFSET %s", [project_id, limit, offset]).fetchall()
+
+
+    def knowledge_index(self, limit=200, offset=0):
+        # Read-only organization index; reports, audit snapshots and file bytes are excluded.
+        with self.pool.connection() as conn:
+            total = conn.execute("SELECT count(*) AS count FROM projects").fetchone()['count']
+            rows = conn.execute("SELECT jsonb_build_object('id',document->'id','title',document->'title','team',document->'team','tech',document->'tech','po',document->'po','pm',document->'pm','members',document->'members','startDate',document->'startDate','endDate',document->'endDate','archivedAt',document->'archivedAt','_knowledge',document->'_knowledge') AS document FROM projects ORDER BY id LIMIT %s OFFSET %s", [limit, offset]).fetchall()
+            keys = ('id','title','team','tech','po','pm','members','startDate','endDate','archivedAt','_knowledge')
+            return {'projects': [{key: row['document'][key] for key in keys if key in row['document']} for row in rows], 'total': total, 'limit': limit, 'offset': offset}
+
+    def save_knowledge(self, project_id, revision, body, actor):
+        def change(project, conn):
+            assert_edit(project, actor)
+            if project.get('archivedAt'):
+                raise DomainError('보관된 과제의 지식 기록은 읽기 전용입니다.')
+            value = body.model_dump()
+            if value['status'] == 'published':
+                for key in ('problem','approach','result','lessons','conditions'):
+                    if not value[key].strip():
+                        raise DomainError('공유하려면 문제·방법·결과·시행착오·재사용 조건을 입력해 주세요.')
+            seen = set()
+            for link in value['relations']:
+                target = link['projectId']
+                if target == project_id or target in seen:
+                    raise DomainError('자기 자신 또는 중복 과제를 연결할 수 없습니다.')
+                seen.add(target)
+                if not conn.execute('SELECT id FROM projects WHERE id=%s', [target]).fetchone():
+                    raise DomainError('연결할 과제를 찾을 수 없습니다.')
+            for artifact in value['artifacts']:
+                if not artifact['title'].strip():
+                    raise DomainError('결과물 이름이 필요합니다.')
+            value.update(updatedAt=approvals.timestamp(), updatedBy=actor.model_dump(), revision=(project.get('_knowledge') or {}).get('revision',0)+1)
+            project['_knowledge'] = value
+            return project
+        return self._mutate(project_id, revision, actor, 'knowledge_saved', change, with_connection=True)

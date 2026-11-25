@@ -95,3 +95,41 @@ class ReportReview(BaseModel):
         if not value.strip():
             raise ValueError('검토 의견이 필요합니다.')
         return value
+
+
+class KnowledgeArtifact(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    title: str = Field(min_length=1, max_length=200)
+    url: str = Field(min_length=1, max_length=2000)
+
+    @field_validator('url')
+    @classmethod
+    def safe_url(cls, value):
+        from urllib.parse import urlsplit
+        try:
+            parsed = urlsplit(value)
+            if parsed.scheme not in ('https', 'http') or not parsed.hostname or parsed.username or parsed.password:
+                raise ValueError('사내 문서의 http(s) 주소를 입력해 주세요.')
+        except ValueError:
+            raise ValueError('문서 주소를 확인해 주세요.')
+        return value
+
+
+class KnowledgeRelation(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    projectId: str = Field(min_length=1, max_length=128)
+    type: Literal['predecessor', 'successor', 'related', 'reuses']
+
+
+class KnowledgeUpdate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    version: Literal[1] = 1
+    status: Literal['draft', 'published'] = 'draft'
+    problem: str = Field(default='', max_length=10000)
+    approach: str = Field(default='', max_length=10000)
+    result: str = Field(default='', max_length=10000)
+    lessons: str = Field(default='', max_length=10000)
+    conditions: str = Field(default='', max_length=10000)
+    nextSteps: str = Field(default='', max_length=10000)
+    artifacts: list[KnowledgeArtifact] = Field(default_factory=list, max_length=20)
+    relations: list[KnowledgeRelation] = Field(default_factory=list, max_length=100)
