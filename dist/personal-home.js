@@ -7,7 +7,10 @@
   const personas=[{id:'demo:pm3',name:'예시 PM 3',role:'participant',team:'예시운영팀',label:'예시 PM 3 · PM / 지난 월 누락'},{id:'demo:collaborator',name:'예시 공동 수행자',role:'participant',team:'예시공정팀',label:'예시 공동 수행자 · 참여 과제 조회'},{id:'demo:po',name:'예시 대표자',role:'project-representative',team:'예시공정팀',label:'예시 대표자 · PO'},{id:'demo:member',name:'예시 일반 구성원',role:'member',team:'예시공정팀',label:'예시 일반 구성원 · 담당 전체 조회'},{id:'demo:lead',name:'예시 팀장',role:'team-lead',team:'예시공정팀',label:'예시 팀장 · 팀 검토'},{id:'demo:head',name:'예시 담당',role:'at-head',team:'AT',label:'예시 담당 · 담당 전체 검토'}];
   let actor=personas[0];const select=document.querySelector('#homePersona');for(const p of personas){const option=document.createElement('option');option.value=p.id;option.textContent=p.label;select.append(option);}
   function renderHome(){StepUI.home(document.querySelector('#personalHomeRoot'),{projects:data,actor,demo:true,onAll:()=>showPage('list'),onRegister:()=>{openForm();registrationReturn='home';},onOpen:(id,task)=>{if(task.tab==='changes'){showPage('approvals');return;}if(task.tab==='plan'){detail(id);return;}openPerformance(id);if(task.month)StepUI.selectReportMonth(task.month);}});}
-  select.onchange=()=>{actor=personas.find(p=>p.id===select.value)||personas[0];renderHome();};document.querySelector('#homeReports').onclick=()=>showPage('performance');
+  const profile=document.createElement('div');profile.id='profileRoot';page.before(profile);
+  function renderProfile(){StepUI.profile(profile,{actor,demo:true,onHome:()=>showPage('home'),onMine:()=>{showPage('home');const heading=document.querySelector('[data-personal-projects] h2');heading?.scrollIntoView?.({block:'start'});heading?.focus({preventScroll:true});},onAll:()=>showPage('list'),onSwitch:()=>{showPage('home');select.focus();}});}
+  renderProfile();
+  select.onchange=()=>{actor=personas.find(p=>p.id===select.value)||personas[0];renderHome();renderProfile();};document.querySelector('#homeReports').onclick=()=>showPage('performance');
   showPage=function(name){page.hidden=name!=='home';nav.classList.toggle('selected',name==='home');previousPage(name);if(name==='home')renderHome();};
   const oldRender=render;render=function(){oldRender();if(!page.hidden)renderHome();};
   // A reporting deep link retains its exact task/month instead of being redirected home.
