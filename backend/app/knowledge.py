@@ -18,6 +18,7 @@ def tokens(text):
 def stamp(project):
     data = {key:project.get(key) for key in (*FIELDS,'team','tech','po','pm','members','steps','monthly','stepReports','_lastAttachment','_poId','_pmId','_teamId','_memberIds')}
     data['knowledge'] = {key:(project.get('_knowledge') or {}).get(key,'') for key in KNOWLEDGE_FIELDS}
+    data['artifacts']=(project.get('_knowledge') or {}).get('artifacts',[])
     return hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
 
 
@@ -36,6 +37,8 @@ def sources(project):
         for month,row in sorted(project.get('stepReports',{}).get(step['id'],{}).items()):
             for key,label in (('reason','지연 사유'),('catchup','만회 계획')):
                 add(f"stepReports.{step['id']}.{month}.{key}",f"{step['name']} · {month} {label}",row.get(key),'report',month)
+    for index,artifact in enumerate((project.get('_knowledge') or {}).get('artifacts',[])):
+        add(f'_knowledge.artifacts.{index}','결과물 문서',artifact['title']+'\n'+artifact['url'],'knowledge')
     rows.extend(project.get('_documentEvidence',[]))
     return rows
 
@@ -56,7 +59,7 @@ def recommendations(query, tech, projects, exclude_id=None):
             if not best or score>best[0]:best=(score,source,matched)
         if not best:continue
         common=[t for t in tech if t!='All Tech' and not t.endswith(' ALL') and t in project.get('tech',[])]
-        result.append({'projectId':project['id'],'title':project['title'],'team':project.get('team',''),'sourceRevision':project.get('_revision',0),'sourceToken':stamp(project),'score':best[0]+len(common),'evidence':[best[1]],'matchedTerms':best[2],'method':'lexical-v1','notice':'문구 일치 후보 · 의미상 관계는 확인이 필요합니다.'})
+        result.append({'projectId':project['id'],'title':project['title'],'team':project.get('team',''),'sourceRevision':project.get('_revision',0),'sourceToken':stamp(project),'score':best[0]+len(common),'evidence':[best[1]],'reuseEvidence':[s for s in sources(project) if not s.get('superseded') and (s['path']=='_knowledge.result' or s['path'].startswith(('_knowledge.artifacts.','attachments.')))][:1],'matchedTerms':best[2],'method':'lexical-v1','notice':'문구 일치 후보 · 의미상 관계는 확인이 필요합니다.'})
     return sorted(result,key=lambda r:(-r['score'],r['projectId']))[:5]
 
 
@@ -149,6 +152,8 @@ def decide(project, target, body, actor, at):
     if not target or target['id']==project['id']:raise DomainError('연결할 과제를 확인해 주세요.')
     if body.targetToken!=stamp(target) or body.contextToken!=stamp(project):raise DomainError('근거 기록이 변경되었습니다. 후보를 새로 불러와 확인해 주세요.',409)
     cited=[s for s in sources(target) if s['path']==body.evidencePath] if body.evidencePath else [s for s in sources(target) if s['path'] in ('title','background')]
+    if body.type=='reuses' and body.decision=='accepted' and not any(s['path']=='_knowledge.result' or s['path'].startswith(('_knowledge.artifacts.','attachments.')) for s in cited):
+        raise DomainError('결과 활용은 경험 카드의 결과 또는 문서 근거를 확인해 주세요.')
     if not cited or any(s.get('superseded') for s in cited):raise DomainError('인용할 근거가 변경되었습니다. 다시 확인해 주세요.',409)
     result=deepcopy(project)
     result.setdefault('_knowledgeDecisions',{})[target['id']]={'targetId':target['id'],'targetToken':stamp(target),'targetRevision':target.get('_revision',0),'contextToken':stamp(project),'type':body.type,'decision':body.decision,'evidence':cited,'contextEvidence':([s for s in sources(project) if s['path'] in ('background','plan')] + [s for s in sources(project) if s['path'].endswith('.reason')][-1:]) or [s for s in sources(project) if s['path']=='title'],'decidedAt':at,'decidedBy':actor.model_dump()}

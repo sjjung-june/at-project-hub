@@ -146,21 +146,20 @@ def test_knowledge_auto_projection_document_search_confirm_and_stale_evidence(po
     candidates=service.recommend_knowledge(KnowledgeQuery(query='광학노이즈'))['candidates']
     assert candidates[0]['projectId']==b['id']
     assert candidates[0]['evidence'][0]['attachmentId']==uploaded['attachmentId']
+    b=service.save_knowledge(b['id'],2,KnowledgeUpdate(result='필터 검증 가이드 확보'),actor)
     context=service.knowledge_context(a['id']);c=next(x for x in context['candidates'] if x['projectId']==b['id'])
     stranger=Actor(id='visitor',name='일반 구성원',role='member',team='AT팀')
-    body=KnowledgeDecision(targetId=b['id'],targetToken=c['sourceToken'],contextToken=context['contextToken'],type='reuses',decision='accepted',evidencePath='background')
+    body=KnowledgeDecision(targetId=b['id'],targetToken=c['sourceToken'],contextToken=context['contextToken'],type='reuses',decision='accepted',evidencePath='_knowledge.result')
     with pytest.raises(DomainError) as denied:service.decide_knowledge(a['id'],1,body,stranger)
     assert denied.value.status==403
     saved=service.decide_knowledge(a['id'],1,body,actor)
     assert service.knowledge_context(a['id'])['metrics']['confirmedReuse']==1
     assert service.history(a['id'])[0]['details']['knowledgeDecisionChanges']['after']
     # Unrelated progress does not invalidate the cited problem statement.
-    updated=service.reports(b['id'],2,ReportUpdate.model_validate({'stepReports':{'a':{'2025-01':{'actual':100}},'b':{'2025-01':{'actual':100}}}}),actor)
+    updated=service.reports(b['id'],b['_revision'],ReportUpdate.model_validate({'stepReports':{'a':{'2025-01':{'actual':100}},'b':{'2025-01':{'actual':100}}}}),actor)
     assert service.knowledge_context(a['id'])['metrics']['confirmedReuse']==1
-    # Changing the quoted problem through the normal approval path requires revalidation.
-    pending=service.request_change(b['id'],updated['_revision'],ChangeRequest(candidate=ProjectPlan.model_validate({**updated,'background':'다른 문제로 전환'}),reason='문제 변경'),actor)
-    lead=Actor(id='lead',name='팀장',role='team-lead',team=actor.team)
-    service.decide(b['id'],pending['_revision'],pending['_changeRequests'][-1]['id'],Decision(decision='approved',comment='확인'),lead)
+    # Changing the quoted result requires revalidation.
+    service.save_knowledge(b['id'],updated['_revision'],KnowledgeUpdate(result='가이드 적용 조건 변경'),actor)
     current=service.knowledge_context(a['id'])
     assert current['metrics']['confirmedReuse']==0 and current['metrics']['needsReview']==1
     assert not [n for n in current['graph']['nodes'] if n['kind']=='relation']

@@ -7,7 +7,7 @@ from app.errors import DomainError
 
 
 def sample(project):
-    return {**deepcopy(project),'_revision':1,'team':'AT','po':'동명이인','pm':'동명이인','background':'센서잡음 때문에 오탐이 반복된다','plan':'잡음 필터 적용','monthly':{'2025-01':{'actual':0,'reason':'센서잡음 유입','catchup':'필터 적용'},'2025-02':{'actual':60}}}
+    return {**deepcopy(project),'_revision':1,'team':'AT','po':'동명이인','pm':'동명이인','background':'센서잡음 때문에 오탐이 반복된다','plan':'잡음 필터 적용','_knowledge':{'result':'검증 가이드 확보'},'monthly':{'2025-01':{'actual':0,'reason':'센서잡음 유입','catchup':'필터 적용'},'2025-02':{'actual':60}}}
 
 
 def test_automatic_facts_and_evidence(project):
@@ -23,11 +23,11 @@ def test_automatic_facts_and_evidence(project):
 def test_confirmation_source_change_and_no_automatic_relation(project,actor):
     p=sample(project);target={**p,'id':'target'}
     c=context(p,[p,target]);candidate=c['candidates'][0]
-    body=KnowledgeDecision(targetId=target['id'],targetToken=candidate['sourceToken'],contextToken=c['contextToken'],type='reuses',decision='accepted',evidencePath=candidate['evidence'][0]['path'])
+    body=KnowledgeDecision(targetId=target['id'],targetToken=candidate['sourceToken'],contextToken=c['contextToken'],type='reuses',decision='accepted',evidencePath='_knowledge.result')
     accepted=decide(p,target,body,actor,'2026-11-26T00:00:00Z')
     assert context(accepted,[accepted,target])['metrics']['confirmedReuse']==1
     assert not context(accepted,[accepted,target])['candidates']
-    changed={**target,'background':'새로운 문제'}
+    changed={**target,'_knowledge':{'result':'변경된 결과'}}
     c=context(accepted,[accepted,changed])
     assert c['metrics']['confirmedReuse']==0
     assert c['metrics']['needsReview']==1
@@ -60,3 +60,10 @@ def test_new_attachment_version_invalidates_original_citation(project,actor):
     result=context(accepted,[accepted,target])
     assert result['metrics']['needsReview']==1 and result['metrics']['confirmedReuse']==0
     assert result['decisions'][0]['currentEvidence'][0]['attachmentId']=='new'
+
+
+def test_reuse_requires_result_or_document_citation(project,actor):
+    p=sample(project);target={**p,'id':'target','_knowledge':{}}
+    body=KnowledgeDecision(targetId='target',targetToken=stamp(target),contextToken=stamp(p),type='reuses',decision='accepted',evidencePath='background')
+    with pytest.raises(DomainError):decide(p,target,body,actor,'now')
+    assert not recommendations('센서잡음',[],[target])[0]['reuseEvidence']
