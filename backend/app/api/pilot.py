@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from .projects import ActorDep, ServiceDep, RevisionDep, etag
 from ..attachments import AttachmentService
 from ..reporting import ReportingService
-from ..schemas import ReportReview
+from ..schemas import ReportReview, KnowledgeQuery
 from ..errors import DomainError
 
 router=APIRouter(prefix='/api',tags=['Pilot workflow'])
@@ -75,3 +75,8 @@ def download(pid:str,aid:str,actor:ActorDep,service:FilesDep):
 @router.get('/knowledge')
 def knowledge_index(actor: ActorDep, service: ServiceDep, limit: int = Query(200, ge=1, le=500), offset: int = Query(0, ge=0)):
     return service.knowledge_index(limit, offset)
+
+
+@router.post('/knowledge/recommendations')
+def recommend_knowledge(body: KnowledgeQuery, actor: ActorDep, service: ServiceDep):
+    return service.recommend_knowledge(body)

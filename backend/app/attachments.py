@@ -63,6 +63,8 @@ class AttachmentService:
             with path.open('xb') as stream:stream.write(data)
             saved=True
             conn.execute('INSERT INTO attachments(id,project_id,step_id,report_month,filename,content_type,size_bytes,sha256,storage_key,replaces_id,created_by) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',[aid,pid,step_id,month,name,ALLOWED[Path(name).suffix.lower()],len(data),sha256(data).hexdigest(),key,replaces_id,Jsonb(actor.model_dump())])
+            from .document_index import index_document
+            index_document(conn,aid,pid,name,sha256(data).hexdigest(),data)
             project['_lastAttachment']={'id':aid,'filename':name,'stepId':step_id,'month':month,'sha256':sha256(data).hexdigest()}
             return project
         try:

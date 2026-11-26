@@ -132,3 +132,45 @@ def test_knowledge_persistence_authorization_conflict_and_history(pool, actor, p
     lead = Actor(id='lead',name='팀장',role='team-lead',team=actor.team)
     approved = service.decide(first['id'],3,pending['_changeRequests'][-1]['id'],Decision(decision='approved',comment='확인'),lead)
     assert approved['_knowledge'] == saved['_knowledge']
+
+
+def test_knowledge_auto_projection_document_search_confirm_and_stale_evidence(pool,actor,project,tmp_path):
+    from app.schemas import KnowledgeQuery,KnowledgeDecision,KnowledgeUpdate
+    from app.attachments import AttachmentService
+    from app.knowledge_backfill import backfill
+    service=ProjectService(pool)
+    a=service.create(ProjectPlan.model_validate({**project,'title':'센서잡음 개선','background':'센서잡음 원인 조사','plan':'잡음 필터 적용'}),actor)
+    b=service.create(ProjectPlan.model_validate({**project,'title':'센서잡음 선행 분석','background':'센서잡음 특성 정리'}),actor)
+    files=AttachmentService(pool,tmp_path,20*1024*1024)
+    uploaded=files.upload(b['id'],1,actor,'가이드.txt','적용 조건: 광학노이즈 환경\n주의: 측정값 재확인'.encode())
+    candidates=service.recommend_knowledge(KnowledgeQuery(query='광학노이즈'))['candidates']
+    assert candidates[0]['projectId']==b['id']
+    assert candidates[0]['evidence'][0]['attachmentId']==uploaded['attachmentId']
+    context=service.knowledge_context(a['id']);c=next(x for x in context['candidates'] if x['projectId']==b['id'])
+    stranger=Actor(id='visitor',name='일반 구성원',role='member',team='AT팀')
+    body=KnowledgeDecision(targetId=b['id'],targetToken=c['sourceToken'],contextToken=context['contextToken'],type='reuses',decision='accepted',evidencePath='background')
+    with pytest.raises(DomainError) as denied:service.decide_knowledge(a['id'],1,body,stranger)
+    assert denied.value.status==403
+    saved=service.decide_knowledge(a['id'],1,body,actor)
+    assert service.knowledge_context(a['id'])['metrics']['confirmedReuse']==1
+    assert service.history(a['id'])[0]['details']['knowledgeDecisionChanges']['after']
+    # Unrelated progress does not invalidate the cited problem statement.
+    updated=service.reports(b['id'],2,ReportUpdate.model_validate({'stepReports':{'a':{'2025-01':{'actual':100}},'b':{'2025-01':{'actual':100}}}}),actor)
+    assert service.knowledge_context(a['id'])['metrics']['confirmedReuse']==1
+    # Changing the quoted problem through the normal approval path requires revalidation.
+    pending=service.request_change(b['id'],updated['_revision'],ChangeRequest(candidate=ProjectPlan.model_validate({**updated,'background':'다른 문제로 전환'}),reason='문제 변경'),actor)
+    lead=Actor(id='lead',name='팀장',role='team-lead',team=actor.team)
+    service.decide(b['id'],pending['_revision'],pending['_changeRequests'][-1]['id'],Decision(decision='approved',comment='확인'),lead)
+    current=service.knowledge_context(a['id'])
+    assert current['metrics']['confirmedReuse']==0 and current['metrics']['needsReview']==1
+    assert not [n for n in current['graph']['nodes'] if n['kind']=='relation']
+    with pytest.raises(DomainError) as stale:service.decide_knowledge(a['id'],saved['_revision'],body,actor)
+    assert stale.value.status==409
+    doc_context=service.knowledge_context(b['id'])
+    assert doc_context['documentSources'][0]['state']=='ready'
+    assert doc_context['draft']['items']['conditions']['evidence'][0]['attachmentId']==uploaded['attachmentId']
+    assert backfill(pool,tmp_path)['indexed']==0  # Existing index is idempotent.
+    own=service.knowledge_context(a['id'])['draft']['items']['problem']['evidence'][0]
+    evidence={'field':'problem',**{k:own[k] for k in ('projectId','path','quote','revision')}}
+    service.save_knowledge(a['id'],saved['_revision'],KnowledgeUpdate(problem='확인한 초안',sourceEvidence=[evidence]),actor)
+    with pytest.raises(DomainError):service.save_knowledge(a['id'],saved['_revision']+1,KnowledgeUpdate(sourceEvidence=[{**evidence,'quote':'존재하지 않는 인용'}]),actor)

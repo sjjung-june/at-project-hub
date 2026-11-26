@@ -98,3 +98,24 @@ def test_knowledge_api_auth_revision_and_safe_link_validation(actor):
         for url in ('javascript:alert(1)', 'https://user:secret@example.test/doc'):
             assert client.put(path, headers={'If-Match':'"3"'}, json={'artifacts':[{'title':'문서','url':url}]}).status_code == 422
         assert client.put(path, headers={'If-Match':'"3"'}, json={'updatedBy':{'id':'forged'}}).status_code == 422
+
+
+def test_knowledge_context_and_recommendation_routes_preserve_auth_and_mutation_revision(actor):
+    class Service:
+        def knowledge_context(self,pid):return {'contextToken':'ctx','graph':{'nodes':[],'edges':[]}}
+        def recommend_knowledge(self,body):return {'candidates':[],'method':'lexical-v1'}
+        def decide_knowledge(self,pid,revision,body,who):
+            assert revision==2 and who.id==actor.id and body.evidencePath=='background'
+            return {'id':pid,'_revision':3}
+    app=create_app(Settings(_env_file=None,app_env='test'))
+    app.dependency_overrides[get_service]=Service
+    with TestClient(app) as client:
+        assert client.get('/api/projects/p/knowledge-context').status_code==401
+        app.dependency_overrides[get_actor]=lambda:actor
+        assert client.get('/api/projects/p/knowledge-context').json()['contextToken']=='ctx'
+        assert client.post('/api/knowledge/recommendations',json={'query':'센서잡음'}).json()['method']=='lexical-v1'
+        body={'targetId':'t','targetToken':'target','contextToken':'ctx','type':'reuses','decision':'accepted','evidencePath':'background'}
+        assert client.post('/api/projects/p/knowledge-decisions',json=body).status_code==409
+        result=client.post('/api/projects/p/knowledge-decisions',json=body,headers={'If-Match':'"2"'})
+        assert result.status_code==200 and result.headers['etag']=='"3"'
+        assert client.post('/api/projects/p/knowledge-decisions',json={**body,'decidedBy':'위조'},headers={'If-Match':'"2"'}).status_code==422

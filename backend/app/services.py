@@ -43,6 +43,7 @@ def audit_details(before, after, action):
                     previous,current=old.get(month,{}).get(field),new.get(month,{}).get(field)
                     if previous!=current:reports.append({'field':'.'.join(filter(None,[kind,step_id,month,field])),'before':previous,'after':current})
     if reports:details['reportChanges']=reports
+    if action=='knowledge_decided':details['knowledgeDecisionChanges']={'before':before.get('_knowledgeDecisions',{}),'after':after.get('_knowledgeDecisions',{})}
     if action=='knowledge_saved':details['knowledgeChanges']={'before':before.get('_knowledge'),'after':after.get('_knowledge')}
     if action=='attachment_uploaded':details['attachment']=after.get('_lastAttachment')
     if before.get('_reporting',{})!=after.get('_reporting',{}):
@@ -96,8 +97,9 @@ class ProjectService:
         with self.pool.connection() as conn:
             return self._save(conn, project, None, actor, "project_created")
 
-    def _mutate(self, project_id, revision, actor, action, change, with_connection=False):
+    def _mutate(self, project_id, revision, actor, action, change, with_connection=False, knowledge_lock=False):
         with self.pool.connection() as conn:
+            if knowledge_lock:conn.execute("SELECT pg_advisory_xact_lock(827352)")
             row = conn.execute("SELECT document,revision FROM projects WHERE id=%s FOR UPDATE", [project_id]).fetchone()
             if not row:
                 raise DomainError("과제를 찾을 수 없습니다.", 404)
@@ -179,6 +181,14 @@ class ProjectService:
             if project.get('archivedAt'):
                 raise DomainError('보관된 과제의 지식 기록은 읽기 전용입니다.')
             value = body.model_dump()
+            from .knowledge import sources
+            current_sources=sources(self._with_documents(project,conn))
+            old_evidence=(project.get('_knowledge') or {}).get('sourceEvidence',[])
+            for evidence in value['sourceEvidence']:
+                if evidence in old_evidence:continue
+                if evidence['projectId']!=project_id or not any(s['path']==evidence['path'] and not s.get('superseded') and s['quote']==evidence['quote'] and (not evidence.get('sourceHash') or evidence['sourceHash']==s.get('sourceHash')) for s in current_sources):
+                    raise DomainError('초안 근거가 현재 원본과 다릅니다. 근거를 다시 불러와 주세요.',409)
+                evidence['revision']=project.get('_revision',0)
             if value['status'] == 'published':
                 for key in ('problem','approach','result','lessons','conditions'):
                     if not value[key].strip():
@@ -198,3 +208,47 @@ class ProjectService:
             project['_knowledge'] = value
             return project
         return self._mutate(project_id, revision, actor, 'knowledge_saved', change, with_connection=True)
+
+    def knowledge_catalog(self, conn=None):
+        # Projection excludes audit history, submission snapshots and request state.
+        keys=('id','title','team','tech','po','pm','members','background','kpi','plan','startDate','endDate','archivedAt','_revision','steps','monthly','stepReports','_poId','_pmId','_teamId','_memberIds','_knowledge','_knowledgeDecisions','_lastAttachment')
+        expression=','.join("'%s',document->'%s'"%(key,key) for key in keys)
+        def read(connection):
+            projects=[{k:v for k,v in row['document'].items() if v is not None} for row in connection.execute('SELECT jsonb_build_object('+expression+') AS document FROM projects ORDER BY id').fetchall()]
+            from .document_index import evidence_rows
+            grouped={}
+            for row in connection.execute("SELECT k.project_id,k.attachment_id,k.filename,k.content_hash,k.state,k.text_content,a.replaces_id,EXISTS(SELECT 1 FROM attachments newer WHERE newer.replaces_id=k.attachment_id) AS superseded FROM knowledge_documents k JOIN attachments a ON a.id=k.attachment_id WHERE k.state='ready' ORDER BY k.project_id,k.attachment_id").fetchall():grouped.setdefault(row['project_id'],[]).append(row)
+            for project in projects:project['_documentEvidence']=evidence_rows(project['id'],project.get('_revision',0),grouped.get(project['id'],[]))
+            return projects
+        if conn is not None:return read(conn)
+        with self.pool.connection() as connection:return read(connection)
+
+    def recommend_knowledge(self, body):
+        from .knowledge import recommendations
+        return {'candidates':recommendations(body.query,body.tech,self.knowledge_catalog(),body.excludeId),'method':'lexical-v1','scope':'담당 전체','notice':'문구 기반 후보입니다. 자동 확정되지 않습니다.'}
+
+    def _with_documents(self,project,conn):
+        from .document_index import evidence_rows
+        rows=conn.execute('SELECT k.attachment_id,k.filename,k.content_hash,k.state,k.text_content,a.replaces_id,EXISTS(SELECT 1 FROM attachments newer WHERE newer.replaces_id=k.attachment_id) AS superseded FROM knowledge_documents k JOIN attachments a ON a.id=k.attachment_id WHERE k.project_id=%s ORDER BY k.attachment_id',[project['id']]).fetchall()
+        return {**project,'_documentEvidence':evidence_rows(project['id'],project.get('_revision',0),rows)}
+
+    def knowledge_context(self, pid):
+        from .knowledge import context
+        project=self.get(pid)
+        with self.pool.connection() as conn:
+            files=conn.execute('SELECT id,filename,sha256 FROM attachments WHERE project_id=%s ORDER BY created_at,id',[pid]).fetchall()
+            texts=conn.execute('SELECT attachment_id,filename,content_hash,state,truncated,text_content FROM knowledge_documents WHERE project_id=%s ORDER BY attachment_id',[pid]).fetchall()
+            project=self._with_documents(project,conn)
+        result=context(project,self.knowledge_catalog(),files)
+        result['documentSources']=[{'attachmentId':t['attachment_id'],'filename':t['filename'],'hash':t['content_hash'],'state':t['state'],'truncated':t['truncated'],'excerpt':t['text_content'][:1200],'source':{'projectId':pid,'path':'attachments.'+t['attachment_id'],'tab':'files','attachmentId':t['attachment_id'],'revision':project['_revision']}} for t in texts]
+        return result
+
+    def decide_knowledge(self,pid,revision,body,actor):
+        from .knowledge import decide
+        def change(project,conn):
+            assert_edit(project,actor)
+            if project.get('archivedAt'):raise DomainError('보관된 과제는 지식 관계를 수정할 수 없습니다.')
+            # Lock reads of the cited target until this decision commits.
+            target=conn.execute('SELECT document FROM projects WHERE id=%s FOR SHARE',[body.targetId]).fetchone()
+            return decide(project,self._with_documents(target['document'],conn) if target else None,body,actor,approvals.timestamp())
+        return self._mutate(pid,revision,actor,'knowledge_decided',change,with_connection=True,knowledge_lock=True)

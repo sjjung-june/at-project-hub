@@ -121,6 +121,16 @@ class KnowledgeRelation(BaseModel):
     type: Literal['predecessor', 'successor', 'related', 'reuses']
 
 
+class KnowledgeEvidence(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    field: Literal['problem','approach','result','lessons','conditions','nextSteps']
+    projectId: str = Field(min_length=1,max_length=128)
+    path: str = Field(min_length=1,max_length=300)
+    quote: str = Field(max_length=10000)
+    revision: int = Field(ge=0)
+    sourceHash: str | None = Field(default=None,max_length=128)
+
+
 class KnowledgeUpdate(BaseModel):
     model_config = ConfigDict(extra='forbid')
     version: Literal[1] = 1
@@ -133,3 +143,21 @@ class KnowledgeUpdate(BaseModel):
     nextSteps: str = Field(default='', max_length=10000)
     artifacts: list[KnowledgeArtifact] = Field(default_factory=list, max_length=20)
     relations: list[KnowledgeRelation] = Field(default_factory=list, max_length=100)
+    sourceEvidence: list[KnowledgeEvidence] = Field(default_factory=list, max_length=30)
+
+
+class KnowledgeQuery(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    query: str = Field(default='', max_length=5000)
+    tech: list[str] = Field(default_factory=list, max_length=50)
+    excludeId: str | None = Field(default=None, max_length=128)
+
+
+class KnowledgeDecision(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    targetId: str = Field(min_length=1, max_length=128)
+    targetToken: str = Field(min_length=1, max_length=128)
+    contextToken: str = Field(min_length=1, max_length=128)
+    evidencePath: str | None = Field(default=None,max_length=300)
+    type: Literal['related', 'reuses'] = 'related'
+    decision: Literal['accepted', 'dismissed']
