@@ -76,7 +76,7 @@ def test_database_workflow_locking_rollback_and_audit(pool, project, actor):
         with pool.connection() as conn:
             conn.execute("DELETE FROM audit_events WHERE project_id=%s", [pid])
     with pool.connection() as conn:
-        assert conn.execute("SELECT count(*) AS count FROM schema_migrations").fetchone()["count"] == 3
+        assert conn.execute("SELECT count(*) AS count FROM schema_migrations").fetchone()["count"] == 4
         assert conn.execute("SELECT status FROM change_requests WHERE id=%s", [request_id]).fetchone()["status"] == "approved"
 
 
@@ -169,6 +169,9 @@ def test_knowledge_auto_projection_document_search_confirm_and_stale_evidence(po
     doc_context=service.knowledge_context(b['id'])
     assert doc_context['documentSources'][0]['state']=='ready'
     assert doc_context['draft']['items']['conditions']['evidence'][0]['attachmentId']==uploaded['attachmentId']
+    files.upload(b['id'],service.get(b['id'])['_revision'],actor,'가이드-v2.txt','적용 조건: 주파수노이즈 환경'.encode(),replaces_id=uploaded['attachmentId'])
+    assert service.recommend_knowledge(KnowledgeQuery(query='광학노이즈'))['candidates']==[]
+    assert service.recommend_knowledge(KnowledgeQuery(query='주파수노이즈'))['candidates'][0]['projectId']==b['id']
     assert backfill(pool,tmp_path)['indexed']==0  # Existing index is idempotent.
     own=service.knowledge_context(a['id'])['draft']['items']['problem']['evidence'][0]
     evidence={'field':'problem',**{k:own[k] for k in ('projectId','path','quote','revision')}}
